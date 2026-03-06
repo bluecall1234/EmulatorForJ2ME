@@ -159,6 +159,7 @@ object Opcodes {
     const val INSTANCEOF   = 0xC1  // Check if object is of given typeance of type
 
     // === Array access ===
+    const val MULTIANEWARRAY = 0xC5  // Create multi-dimensional array
     const val IALOAD       = 0x2E  // Load int from array
     const val LALOAD       = 0x2F  // Load long from array
     const val FALOAD       = 0x30  // Load float from array
@@ -193,6 +194,8 @@ object Opcodes {
             ICONST_1 -> "iconst_1"; ICONST_2 -> "iconst_2"
             ICONST_3 -> "iconst_3"; ICONST_4 -> "iconst_4"
             ICONST_5 -> "iconst_5"
+            LCONST_0 -> "lconst_0"; LCONST_1 -> "lconst_1"
+            FCONST_0 -> "fconst_0"; FCONST_1 -> "fconst_1"; FCONST_2 -> "fconst_2"
             BIPUSH -> "bipush"; SIPUSH -> "sipush"
             LDC -> "ldc"; LDC_W -> "ldc_w"; LDC2_W -> "ldc2_w"
             ILOAD -> "iload"; ALOAD -> "aload"

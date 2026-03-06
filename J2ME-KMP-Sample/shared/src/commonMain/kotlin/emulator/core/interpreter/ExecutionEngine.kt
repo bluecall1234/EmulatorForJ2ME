@@ -612,6 +612,45 @@ class ExecutionEngine(
                     val count = frame.popInt()
                     frame.push(arrayOfNulls<Any>(count))
                 }
+                
+                Opcodes.MULTIANEWARRAY -> {
+                    val index = frame.readU2()
+                    val dimensionsCount = frame.readU1()
+                    val className = constantPool.getClassName(index) // e.g., "[[I"
+                    
+                    val dimensions = IntArray(dimensionsCount)
+                    for (i in dimensionsCount - 1 downTo 0) {
+                        dimensions[i] = frame.popInt()
+                    }
+                    
+                    fun allocateArray(dimIndex: Int, typeDesc: String): Any {
+                        val size = dimensions[dimIndex]
+                        return if (dimIndex == dimensionsCount - 1) {
+                            // Substring after the `[` array brackets
+                            val leafType = typeDesc.substring(typeDesc.lastIndexOf('[') + 1)
+                            when (leafType) {
+                                "I" -> IntArray(size)
+                                "B", "Z" -> ByteArray(size)
+                                "C" -> CharArray(size)
+                                "S" -> ShortArray(size)
+                                "J" -> LongArray(size)
+                                "F" -> FloatArray(size)
+                                "D" -> DoubleArray(size)
+                                else -> arrayOfNulls<Any>(size)
+                            }
+                        } else {
+                            val arr = arrayOfNulls<Any>(size)
+                            for (i in 0 until size) {
+                                arr[i] = allocateArray(dimIndex + 1, typeDesc)
+                            }
+                            arr
+                        }
+                    }
+                    
+                    if (debugMode) println("  [VM] MULTIANEWARRAY $className with dimensions ${dimensions.contentToString()}")
+                    val multiArray = allocateArray(0, className)
+                    frame.push(multiArray)
+                }
                 Opcodes.AALOAD -> {
                     val index = frame.popInt()
                     val arr = frame.pop() as Array<*>
