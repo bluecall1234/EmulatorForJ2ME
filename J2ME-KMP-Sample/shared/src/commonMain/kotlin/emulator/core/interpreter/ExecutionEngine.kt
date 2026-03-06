@@ -368,14 +368,20 @@ class ExecutionEngine(
                 }
                 Opcodes.BALOAD -> {
                     val index = frame.popInt()
-                    val arr = frame.pop() as ByteArray
-                    frame.push(arr[index].toInt())
+                    when (val arr = frame.pop()) {
+                        is ByteArray -> frame.push(arr[index].toInt())
+                        is BooleanArray -> frame.push(if (arr[index]) 1 else 0)
+                        else -> throw RuntimeException("BALOAD on invalid array type: ${arr?.let { it::class.simpleName }}")
+                    }
                 }
                 Opcodes.BASTORE -> {
                     val value = frame.popInt()
                     val index = frame.popInt()
-                    val arr = frame.pop() as ByteArray
-                    arr[index] = value.toByte()
+                    when (val arr = frame.pop()) {
+                        is ByteArray -> arr[index] = value.toByte()
+                        is BooleanArray -> arr[index] = (value != 0)
+                        else -> throw RuntimeException("BASTORE on invalid array type: ${arr?.let { it::class.simpleName }}")
+                    }
                 }
                 Opcodes.CALOAD -> {
                     val index = frame.popInt()
