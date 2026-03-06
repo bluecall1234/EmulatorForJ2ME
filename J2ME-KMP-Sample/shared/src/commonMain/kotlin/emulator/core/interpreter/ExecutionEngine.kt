@@ -187,6 +187,10 @@ class ExecutionEngine(
                     val shift = frame.popInt(); val value = frame.popInt()
                     frame.push(value shr (shift and 0x1F))
                 }
+                Opcodes.IUSHR -> {
+                    val shift = frame.popInt(); val value = frame.popInt()
+                    frame.push(value ushr (shift and 0x1F))
+                }
                 Opcodes.IAND -> {
                     val b = frame.popInt(); val a = frame.popInt()
                     frame.push(a and b)
@@ -212,6 +216,30 @@ class ExecutionEngine(
                 Opcodes.LMUL -> {
                     val b = frame.popLong(); val a = frame.popLong()
                     frame.push(a * b)
+                }
+                Opcodes.LSHL -> {
+                    val shift = frame.popInt(); val value = frame.popLong()
+                    frame.push(value shl (shift and 0x3F))
+                }
+                Opcodes.LSHR -> {
+                    val shift = frame.popInt(); val value = frame.popLong()
+                    frame.push(value shr (shift and 0x3F))
+                }
+                Opcodes.LUSHR -> {
+                    val shift = frame.popInt(); val value = frame.popLong()
+                    frame.push(value ushr (shift and 0x3F))
+                }
+                Opcodes.LAND -> {
+                    val b = frame.popLong(); val a = frame.popLong()
+                    frame.push(a and b)
+                }
+                Opcodes.LOR -> {
+                    val b = frame.popLong(); val a = frame.popLong()
+                    frame.push(a or b)
+                }
+                Opcodes.LXOR -> {
+                    val b = frame.popLong(); val a = frame.popLong()
+                    frame.push(a xor b)
                 }
                 Opcodes.LCMP -> {
                     val b = frame.popLong(); val a = frame.popLong()

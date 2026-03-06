@@ -94,10 +94,17 @@ object Opcodes {
     const val IREM         = 0x70  // int remainder (modulo)
     const val INEG         = 0x74  // int negate
     const val ISHL         = 0x78  // int shift left
+    const val LSHL         = 0x79  // long shift left
     const val ISHR         = 0x7A  // int shift right (signed)
+    const val LSHR         = 0x7B  // long shift right (signed)
+    const val IUSHR        = 0x7C  // int shift right (unsigned)
+    const val LUSHR        = 0x7D  // long shift right (unsigned)
     const val IAND         = 0x7E  // int bitwise AND
+    const val LAND         = 0x7F  // long bitwise AND
     const val IOR          = 0x80  // int bitwise OR
+    const val LOR          = 0x81  // long bitwise OR
     const val IXOR         = 0x82  // int bitwise XOR
+    const val LXOR         = 0x83  // long bitwise XOR
 
     // === Type conversion ===
     const val I2L          = 0x85  // int to long
@@ -219,9 +226,13 @@ object Opcodes {
             DASTORE -> "dastore"; AASTORE -> "aastore"; BASTORE -> "bastore"
             CASTORE -> "castore"; SASTORE -> "sastore"
             POP -> "pop"; DUP -> "dup"; SWAP -> "swap"
-            IADD -> "iadd"; ISUB -> "isub"; IMUL -> "imul"
-            IDIV -> "idiv"; IREM -> "irem"; INEG -> "ineg"
-            IAND -> "iand"; IOR -> "ior"; IXOR -> "ixor"
+            IADD -> "iadd"; LADD -> "ladd"; ISUB -> "isub"; LSUB -> "lsub"
+            IMUL -> "imul"; LMUL -> "lmul"; IDIV -> "idiv"
+            IREM -> "irem"; INEG -> "ineg"
+            ISHL -> "ishl"; LSHL -> "lshl"; ISHR -> "ishr"; LSHR -> "lshr"
+            IUSHR -> "iushr"; LUSHR -> "lushr"
+            IAND -> "iand"; LAND -> "land"; IOR -> "ior"; LOR -> "lor"
+            IXOR -> "ixor"; LXOR -> "lxor"
             IFEQ -> "ifeq"; IFNE -> "ifne"
             IFLT -> "iflt"; IFGE -> "ifge"
             IFGT -> "ifgt"; IFLE -> "ifle"
