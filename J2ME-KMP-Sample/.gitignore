@@ -1,0 +1,79 @@
+# ============================================================
+# .gitignore — J2ME KMP Emulator (Android + iOS + KMP + CMake)
+# ============================================================
+
+# ─── Gradle ───────────────────────────────────────────────
+.gradle/
+build/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+local.properties
+
+# ─── Kotlin / Android Studio IDE ──────────────────────────
+.idea/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+captures/
+*.hprof
+
+# ─── Android ──────────────────────────────────────────────
+androidApp/release/
+androidApp/.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# ─── Native / CMake / NDK ─────────────────────────────────
+.cxx/
+nativeMain/.cxx/
+nativeMain/sdl2/build/
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.so
+*.a
+*.o
+*.obj
+
+# ─── iOS / Xcode ──────────────────────────────────────────
+*.xcworkspace/
+DerivedData/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.xcuserstate
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+
+# ─── KMP / Compose ────────────────────────────────────────
+shared/.kotlin/
+shared/build/
+kotlin-js-store/
+
+# ─── Logs & Temp ──────────────────────────────────────────
+logcat.txt
+*.log
+*.tmp
+*.bak
+*.swp
+~$*
+
+# ─── Secrets / Signing ────────────────────────────────────
+*.jks
+*.keystore
+keystore.properties
+google-services.json
+GoogleService-Info.plist
