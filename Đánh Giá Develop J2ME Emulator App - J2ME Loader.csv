@@ -1,0 +1,30 @@
+,,,,,,
+,,,,,,
+,,,,,,
+STT,Tiêu chí,Đánh giá,Nhận xét chi tiết,Rủi ro,Hướng giải quyết,Kết luận
+1,Có đầy đủ source code để customize hay có dùng thư viện bên ngoài,Khá ổn,"Source của J2ME-Loader khá đầy đủ, Phần lớn code viết bằng Java/Kotlin. Có thể customize nhiều thành phần: UI/UX, input mapping, scaling, game management. Một số phần quan trọng như rendering và 3D có native C/C++ qua JNI. Không phụ thuộc nhiều thư viện đóng.","- Một số module dùng JNI. Native layer khó sửa hơn Java
+- Một số vendor API J2ME phức tạp
+- Codebase khá lớn (~900 class)","- Tách layer runtime / UI / renderer
+- Chỉ maintain subset API cần thiết cho games",Có đủ source để customize sâu và tách làm sản phẩm riêng. Native layer là phần cần chú ý.
+2,"Tỉ lệ chạy ổn như nào, các build bị lỗi liệu có hướng giải quyết không",Trung bình ,- Test nhanh với một số game J2ME (Gameloft) cho thấy game có thể chạy nhưng gặp bug scale/resolution. ,"- Repo cũng có nhiều issue chưa xử lý ~210 issues chưa fix.
+- Có khả năng cần maintain fork riêng","- Fix scale/input mapping
+- Thiết lập CI build chuẩn
+- Lập compatibility matrix 20–30 game","Có thể build và chạy được, nhưng cần coi project fork maintain cho các issues và tách thành nhiều update."
+3,Xa hơn là thiết kế lại EMU để có UI/UX user-friendly,Rất khả thi,"Source hiện tại cho phép thay đổi UI khá dễ. Có thể xây lại UI emulator, Game library, Spec game settings, virtual keypad, keycode, scaling presets.","- Runtime và UI đang hơi dính nhau
+- Một số logic Android nằm trong emulator core
+- Nếu refactor nhiều có thể ảnh hưởng compatibility","- Tách emulator core khỏi Android UI
+- Thiết kế abstraction layer cho input, display, storage:
+Vd: KeyEvent.KEYCODE_DPAD_UP ->
+Interface:
+interface InputDevice {
+    boolean isKeyPressed(int keyCode);
+}
+Android Implement:
+class AndroidInput implements InputDevice {
+    ...
+}",Hoàn toàn có thể nâng cấp thành product Android có UI/UX tốt.
+4,Khả năng nâng cấp / mở rộng lên iOS sau này,Khó nếu giữ kiến trúc hiện tại ,"Source hiện tại phụ thuộc Android runtime và JNI. Việc port trực tiếp sang iOS rất khó, đặc biệt nếu emulator cho phép load JAR động. Cần thay đổi kiến trúc để có core cross-platform.",- Runtime Java phụ thuộc Android VM- Dynamic code loading có thể khó publish App Store- Native JNI không dùng lại được trên iOS,"Có 4 hướng khả thi:
+1. Cross-platform core C/C++ + SDL2: viết JVM bytecode interpreter native, UI native cho Android/iOS.
+2. Rust core VM: tương tự C++ nhưng memory safe hơn.
+3. Kotlin Multiplatform: share logic Kotlin, nhưng performance interpreter thấp hơn.
+4. Web/WASM emulator: chạy trong WebView để dễ phân phối iOS. Rủi ro performance thấp hơn native, debug phức tạp, một số API (sound / 3D) có thể không ổn định.","Không nên kỳ vọng port trực tiếp Android source sang iOS. Nếu cần iOS lâu dài, nên refactor kiến trúc sang native cross-platform emulator core."

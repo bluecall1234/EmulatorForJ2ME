@@ -1,0 +1,20 @@
+# This file is used by Kotlin/Native cinterop tool to generate Kotlin bindings for a C library.
+# We are creating a bridge between Kotlin and the SDL2 C headers.
+
+headers = SDL.h SDL_main.h
+# Exclude unsupported or overly complex definitions to speed up compilation
+compilerOpts.ios = -D_POSIX_SOURCE -I../../nativeMain/sdl2/include
+
+# Linker options: Since we compile SDL2 from source, we might need these later if we use prebuilts.
+# For now, relying on Xcode/CMake to link the static library when building the final iOS App.
+# linkerOpts = -framework SDL2 -framework GameController -framework CoreHaptics
+
+---
+
+// You can add custom C helper functions here if needed.
+// These will be compiled and made available to Kotlin Native directly.
+// This is very powerful because it avoids JNI overhead entirely on iOS.
+void test_ios_bridge() {
+    // A simple function to test if C-Interop is successfully linked.
+    // Equivalent to what we did in `android_jni_bridge.cpp` with `initSDL()`
+}
