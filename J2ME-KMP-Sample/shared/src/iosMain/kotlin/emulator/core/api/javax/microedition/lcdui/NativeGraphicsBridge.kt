@@ -6,9 +6,13 @@ package emulator.core.api.javax.microedition.lcdui
  */
 actual object NativeGraphicsBridge {
     
-    actual fun initSDL() {
+    actual fun initSDL(width: Int, height: Int) {
         // TODO: call sdl2.SDL_Init(sdl2.SDL_INIT_VIDEO...)
-        println("[iOS NativeGraphicsBridge] initSDL")
+        println("[iOS NativeGraphicsBridge] initSDL: $width x $height")
+    }
+
+    actual fun setSurface(surface: Any?) {
+        // Surface is an Android-only concept. Ignore on iOS.
     }
 
     actual fun clearScreen() {

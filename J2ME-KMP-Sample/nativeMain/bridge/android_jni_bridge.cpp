@@ -1,7 +1,9 @@
 #include <android/log.h>
+#include <android/native_window_jni.h>
 #include <jni.h>
 #include <stdint.h>
-
+#include <stdlib.h>
+#include <string.h>
 
 #define LOG_TAG "J2ME_NATIVE"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -9,50 +11,69 @@
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 
 /**
- * JNI Bridge for the J2ME Emulator - Software Framebuffer Edition
- *
- * FIX #2: JNI function names updated to match the Kotlin class
- * "NativeGraphicsBridgeJni" which is a Kotlin internal object in the
- * `emulator.core.api.javax.microedition.lcdui` package. The JNI naming
- * convention for Kotlin objects is the same as Java classes:
- *           Java_{package}_{ClassName}_{methodName}
- *
- * FIX #3: SDL2 requires an ANativeWindow (SurfaceView) to create a renderer.
- *         Since Phase 4 (SurfaceView integration) is not done yet, we use a
- *         software pixel buffer (offline framebuffer) as a safe placeholder.
- *         The Kotlin interpreter can call all graphics commands without
- * crashing. When Phase 4 is ready, replace these stubs with real SDL2 calls.
+ * JNI Bridge for the J2ME Emulator - Native Window Edition (Phase 4)
  */
 
 // ============================================================
-// Software Framebuffer (offline render target)
+// Software Framebuffer & Native Window
 // ============================================================
-#define FB_WIDTH 240
-#define FB_HEIGHT 320
-
-static uint32_t gFramebuffer[FB_WIDTH * FB_HEIGHT];
+static uint32_t *gFramebuffer = nullptr;
+static int gWidth = 240;
+static int gHeight = 320;
 static bool gInitialized = false;
+
+static ANativeWindow *gWindow = nullptr;
 
 // ============================================================
 // Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeInitSDL
 // ============================================================
 extern "C" JNIEXPORT void JNICALL
 Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeInitSDL(
-    JNIEnv *env, jobject /* this */) {
+    JNIEnv *env, jobject /* this */, jint width, jint height) {
 
   if (gInitialized) {
     LOGI("nativeInitSDL: already initialized.");
     return;
   }
 
-  for (int i = 0; i < FB_WIDTH * FB_HEIGHT; i++) {
+  gWidth = width;
+  gHeight = height;
+  gFramebuffer = (uint32_t *)malloc(width * height * sizeof(uint32_t));
+
+  for (int i = 0; i < width * height; i++) {
     gFramebuffer[i] = 0xFF000000; // clear to black
   }
   gInitialized = true;
-  LOGI("nativeInitSDL: Software framebuffer %dx%d initialized.", FB_WIDTH,
-       FB_HEIGHT);
-  // NOTE: Real SDL2 init requires ANativeWindow from a SurfaceView.
-  // This will be wired up in Phase 4 (SurfaceView + SDL2 integration).
+  LOGI("nativeInitSDL: Software framebuffer %dx%d initialized.", width, height);
+}
+
+// ============================================================
+// nativeSetSurface
+// ============================================================
+extern "C" JNIEXPORT void JNICALL
+Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeSetSurface(
+    JNIEnv *env, jobject /* this */, jobject surface) {
+
+  if (gWindow != nullptr) {
+    ANativeWindow_release(gWindow);
+    gWindow = nullptr;
+  }
+
+  if (surface != nullptr) {
+    gWindow = ANativeWindow_fromSurface(env, surface);
+    if (gWindow != nullptr) {
+      // Hardware Composer will scale the buffer mathematically to the screen
+      // size
+      ANativeWindow_setBuffersGeometry(gWindow, gWidth, gHeight,
+                                       WINDOW_FORMAT_RGBA_8888);
+      LOGI("nativeSetSurface: Connected ANativeWindow (%dx%d buffer geometry)",
+           gWidth, gHeight);
+    } else {
+      LOGE("nativeSetSurface: Failed to get ANativeWindow from surface");
+    }
+  } else {
+    LOGI("nativeSetSurface: Released ANativeWindow");
+  }
 }
 
 // ============================================================
@@ -62,11 +83,11 @@ extern "C" JNIEXPORT void JNICALL
 Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeClearScreen(
     JNIEnv *env, jobject /* this */) {
 
-  if (!gInitialized) {
+  if (!gInitialized || gFramebuffer == nullptr) {
     LOGE("nativeClearScreen: not initialized!");
     return;
   }
-  for (int i = 0; i < FB_WIDTH * FB_HEIGHT; i++) {
+  for (int i = 0; i < gWidth * gHeight; i++) {
     gFramebuffer[i] = 0xFF000000;
   }
   LOGD("nativeClearScreen: cleared to black.");
@@ -79,12 +100,30 @@ extern "C" JNIEXPORT void JNICALL
 Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativePresentScreen(
     JNIEnv *env, jobject /* this */) {
 
-  if (!gInitialized) {
+  if (!gInitialized || gFramebuffer == nullptr) {
     LOGE("nativePresentScreen: not initialized!");
     return;
   }
-  // Phase 4: blit gFramebuffer → ANativeWindow / SurfaceView here.
-  LOGI("nativePresentScreen: frame ready (Phase 4: blit to SurfaceView).");
+
+  if (gWindow == nullptr) {
+    // Surface is not available right now, just drop the frame
+    return;
+  }
+
+  ANativeWindow_Buffer buffer;
+  if (ANativeWindow_lock(gWindow, &buffer, nullptr) == 0) {
+    auto *dest = (uint32_t *)buffer.bits;
+    auto *src = gFramebuffer;
+
+    // Copy row by row to handle stride differences
+    for (int y = 0; y < gHeight; y++) {
+      memcpy(dest + (y * buffer.stride), src + (y * gWidth),
+             gWidth * sizeof(uint32_t));
+    }
+    ANativeWindow_unlockAndPost(gWindow);
+  } else {
+    LOGE("nativePresentScreen: Failed to lock ANativeWindow");
+  }
 }
 
 // ============================================================
@@ -95,7 +134,7 @@ Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeFi
     JNIEnv *env, jobject /* this */, jint x, jint y, jint w, jint h, jint r,
     jint g, jint b, jint a) {
 
-  if (!gInitialized) {
+  if (!gInitialized || gFramebuffer == nullptr) {
     LOGE("nativeFillRect: not initialized!");
     return;
   }
@@ -107,12 +146,12 @@ Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeFi
   // Clamp to framebuffer bounds
   int x0 = (x < 0) ? 0 : x;
   int y0 = (y < 0) ? 0 : y;
-  int x1 = ((x + w) > FB_WIDTH) ? FB_WIDTH : (x + w);
-  int y1 = ((y + h) > FB_HEIGHT) ? FB_HEIGHT : (y + h);
+  int x1 = ((x + w) > gWidth) ? gWidth : (x + w);
+  int y1 = ((y + h) > gHeight) ? gHeight : (y + h);
 
   for (int py = y0; py < y1; py++) {
     for (int px = x0; px < x1; px++) {
-      gFramebuffer[py * FB_WIDTH + px] = color;
+      gFramebuffer[py * gWidth + px] = color;
     }
   }
   LOGD("nativeFillRect(%d,%d,%d,%d) color=0x%08X OK", x, y, w, h, color);

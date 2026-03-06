@@ -19,7 +19,8 @@ internal object NativeGraphicsBridgeJni {
         }
     }
 
-    external fun nativeInitSDL()
+    external fun nativeInitSDL(width: Int, height: Int)
+    external fun nativeSetSurface(surface: Any?)
     external fun nativeClearScreen()
     external fun nativePresentScreen()
     external fun nativeFillRect(x: Int, y: Int, w: Int, h: Int, r: Int, g: Int, b: Int, a: Int)
@@ -31,8 +32,12 @@ actual object NativeGraphicsBridge {
         NativeGraphicsBridgeJni  // trigger static init → loads the .so
     }
 
-    actual fun initSDL() {
-        NativeGraphicsBridgeJni.nativeInitSDL()
+    actual fun initSDL(width: Int, height: Int) {
+        NativeGraphicsBridgeJni.nativeInitSDL(width, height)
+    }
+
+    actual fun setSurface(surface: Any?) {
+        NativeGraphicsBridgeJni.nativeSetSurface(surface)
     }
 
     actual fun clearScreen() {

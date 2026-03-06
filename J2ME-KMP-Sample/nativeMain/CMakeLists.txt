@@ -16,4 +16,4 @@ add_library(j2me_native SHARED
 
 # Link the libraries
 target_include_directories(j2me_native PRIVATE sdl2/include)
-target_link_libraries(j2me_native PRIVATE ${log-lib} SDL2-static)
+target_link_libraries(j2me_native PRIVATE ${log-lib} android SDL2-static)

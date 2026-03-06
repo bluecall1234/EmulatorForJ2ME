@@ -18,9 +18,14 @@
 - [x] Map J2ME Graphics calls to SDL2 Render APIs
 
 ## Phase 4: UI & App Shell (The Face)
-- [ ] Build Compose Multiplatform App Shell (`composeApp`)
-- [ ] Implement Game Library (File Picker)
-- [ ] Build Virtual Keyboard Overlay (CMP over SDL2 Surface)
+- [x] Build Compose Multiplatform App Shell (`composeApp`)
+- [ ] Implement Game Library (File Picker, Add/Delete Games)
+- [x] Build Virtual Keyboard Overlay (CMP over SDL2 Surface)
 
-## Phase 5: Optimization (Future)
+## Phase 5: Optimization & System Interaction (Future)
+- [ ] Implement Dynamic Bytecode Method Execution for non-native invocations (Fix for Custom Classes/Constructors)
+- [ ] Implement Record Management System (RMS) for Game Saves
+- [ ] Implement Touch Events Mapping (Translate Compose Pointer input to J2ME `pointerPressed` coords)
+- [ ] Build "Game Settings" Screen (Dynamic Resolution configs, toggle Soft/Touch input)
+- [ ] Connect Virtual Keyboard events to `ExecutionEngine` (Hardware Key mapping)
 - [ ] Implement FastArrayHeapObject for Performance Memory Mode

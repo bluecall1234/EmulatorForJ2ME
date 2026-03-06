@@ -108,6 +108,10 @@ object Opcodes {
 
     // === Comparison ===
     const val LCMP         = 0x94  // long compare
+    const val FCMPL        = 0x95  // float compare (< on NaN)
+    const val FCMPG        = 0x96  // float compare (> on NaN)
+    const val DCMPL        = 0x97  // double compare (< on NaN)
+    const val DCMPG        = 0x98  // double compare (> on NaN)
     const val IFEQ         = 0x99  // Branch if int == 0
     const val IFNE         = 0x9A  // Branch if int != 0
     const val IFLT         = 0x9B  // Branch if int < 0
@@ -147,8 +151,12 @@ object Opcodes {
     const val ANEWARRAY    = 0xBD  // Create new reference array
     const val ARRAYLENGTH  = 0xBE  // Get array length
     const val ATHROW       = 0xBF  // Throw exception
+    const val MONITORENTER = 0xC2  // Enter monitor for object
+    const val MONITOREXIT  = 0xC3  // Exit monitor for object
+
+    // === Casts/Type checking ===
     const val CHECKCAST    = 0xC0  // Check if object is of given type
-    const val INSTANCEOF   = 0xC1  // Check if object is instance of type
+    const val INSTANCEOF   = 0xC1  // Check if object is of given typeance of type
 
     // === Array access ===
     const val IALOAD       = 0x2E  // Load int from array
@@ -202,6 +210,10 @@ object Opcodes {
             IFGT -> "ifgt"; IFLE -> "ifle"
             IF_ICMPEQ -> "if_icmpeq"; IF_ICMPNE -> "if_icmpne"
             IF_ICMPLT -> "if_icmplt"; IF_ICMPGE -> "if_icmpge"
+            IF_ICMPGT -> "if_icmpgt"; IF_ICMPLE -> "if_icmple"
+            IF_ACMPEQ -> "if_acmpeq"; IF_ACMPNE -> "if_acmpne"
+            LCMP -> "lcmp"; FCMPL -> "fcmpl"; FCMPG -> "fcmpg"
+            DCMPL -> "dcmpl"; DCMPG -> "dcmpg"
             GOTO -> "goto"
             IRETURN -> "ireturn"; ARETURN -> "areturn"; RETURN -> "return"
             GETSTATIC -> "getstatic"; PUTSTATIC -> "putstatic"

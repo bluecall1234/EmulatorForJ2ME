@@ -217,6 +217,24 @@ class ExecutionEngine(
                     val b = frame.popLong(); val a = frame.popLong()
                     frame.push(a.compareTo(b))
                 }
+                Opcodes.FCMPL, Opcodes.FCMPG -> {
+                    val b = frame.pop() as Float; val a = frame.pop() as Float
+                    when {
+                        a.isNaN() || b.isNaN() -> frame.push(if (opcode == Opcodes.FCMPG) 1 else -1)
+                        a > b -> frame.push(1)
+                        a == b -> frame.push(0)
+                        else -> frame.push(-1)
+                    }
+                }
+                Opcodes.DCMPL, Opcodes.DCMPG -> {
+                    val b = frame.pop() as Double; val a = frame.pop() as Double
+                    when {
+                        a.isNaN() || b.isNaN() -> frame.push(if (opcode == Opcodes.DCMPG) 1 else -1)
+                        a > b -> frame.push(1)
+                        a == b -> frame.push(0)
+                        else -> frame.push(-1)
+                    }
+                }
 
                 // === INCREMENT ===
                 Opcodes.IINC -> {
@@ -365,15 +383,17 @@ class ExecutionEngine(
                     val index = frame.readU2()
                     val className = constantPool.getClassName(index)
                     if (debugMode) println("  [VM] NEW $className")
+                    interpreter.initializeClass(className)
                     frame.push(interpreter.allocateObject(className))
                 }
 
                 Opcodes.GETSTATIC -> {
                     val index = frame.readU2()
                     val (cls, name, desc) = constantPool.resolveFieldRef(index)
+                    interpreter.initializeClass(cls)
                     val targetClass = interpreter.getClass(cls) 
                         ?: throw RuntimeException("Class not loaded: $cls")
-                    val value = targetClass.staticFields["$name:$desc"]
+                    val value = targetClass.staticFields["$name:$desc"] ?: getDefaultValueForType(desc)
                     if (debugMode) println("  [VM] GETSTATIC $cls.$name:$desc -> $value")
                     frame.push(value)
                 }
@@ -383,6 +403,7 @@ class ExecutionEngine(
                     val (cls, name, desc) = constantPool.resolveFieldRef(index)
                     val value = frame.pop()
                     if (debugMode) println("  [VM] PUTSTATIC $cls.$name:$desc = $value")
+                    interpreter.initializeClass(cls)
                     val targetClass = interpreter.getClass(cls) 
                         ?: throw RuntimeException("Class not loaded: $cls")
                     targetClass.staticFields["$name:$desc"] = value
@@ -392,8 +413,8 @@ class ExecutionEngine(
                     val index = frame.readU2()
                     val (_, name, desc) = constantPool.resolveFieldRef(index)
                     val obj = frame.pop() as emulator.core.memory.HeapObject
-                    val value = obj.instanceFields["$name:$desc"]
-                    if (debugMode) println("  [VM] GETFIELD $name:$desc from $obj -> $value")
+                    val value = obj.instanceFields["$name:$desc"] ?: getDefaultValueForType(desc)
+                    if (debugMode) println("  [VM] GETFIELD $name:$desc -> $value on $obj")
                     frame.push(value)
                 }
                 
@@ -412,6 +433,10 @@ class ExecutionEngine(
                     val isStatic = (opcode == Opcodes.INVOKESTATIC)
 
                     if (debugMode) println("  [VM] ${Opcodes.nameOf(opcode)} $cls.$name$desc")
+                    
+                    if (isStatic) {
+                        interpreter.initializeClass(cls)
+                    }
 
                     // FIX #4: Pass isStatic so NativeMethodBridge pops 'this' correctly
                     val isHandled = emulator.core.api.NativeMethodBridge.callNativeMethod(
@@ -422,17 +447,41 @@ class ExecutionEngine(
                         isStatic = isStatic
                     )
 
-                    // If not handled by NativeBridge, stub it out to prevent stack corruption
+                    // If not handled by NativeBridge, it means it's a custom game class 
+                    // (or an unimplemented API we must stub if it doesn't exist).
                     if (!isHandled) {
-                        println("  [VM] WARNING: Invoking unhandled non-native method $cls.$name$desc (stub)")
-                        val argCount = countMethodArgs(desc)
-                        for (j in 0 until argCount) {
-                            if (frame.stackSize() > 0) frame.pop()
-                        }
-                        // Pop 'this' only for non-static invocations
-                        if (!isStatic && frame.stackSize() > 0) frame.pop()
-                        if (!desc.endsWith(")V")) {
-                            frame.push(0) // dummy return value
+                        val methodClass = interpreter.getClass(cls)
+                        
+                        if (methodClass != null && methodClass.findMethod(name) != null) {
+                            // Phase 5.2: Dynamic Bytecode Execution for non-native methods!
+                            val argCount = countMethodArgs(desc)
+                            val totalArgs = if (isStatic) argCount else argCount + 1
+                            val args = Array<Any?>(totalArgs) { null }
+                            
+                            // Pop arguments from stack (in reverse order)
+                            for (j in totalArgs - 1 downTo 0) {
+                                args[j] = frame.pop()
+                            }
+                            
+                            // Let the interpreter recursively execute the bytecode
+                            val result = interpreter.executeMethod(cls, name, desc, args)
+                            
+                            // Push the return value back (if any)
+                            if (!desc.endsWith(")V")) {
+                                frame.push(result)
+                            }
+                        } else {
+                            // Stub it out (e.g. missing API or interface we haven't ported)
+                            println("  [VM] WARNING: Missing class/method for $cls.$name$desc (stubbing)")
+                            val argCount = countMethodArgs(desc)
+                            for (j in 0 until argCount) {
+                                if (frame.stackSize() > 0) frame.pop()
+                            }
+                            // Pop 'this' only for non-static invocations
+                            if (!isStatic && frame.stackSize() > 0) frame.pop()
+                            if (!desc.endsWith(")V")) {
+                                frame.push(0) // dummy return value
+                            }
                         }
                     }
                 }
@@ -454,13 +503,29 @@ class ExecutionEngine(
                     )
 
                     if (!isHandled) {
-                        println("  [VM] WARNING: Unhandled invokeinterface $cls.$name$desc (stub)")
-                        val argCount = countMethodArgs(desc)
-                        for (j in 0 until argCount) {
-                            if (frame.stackSize() > 0) frame.pop()
+                        val methodClass = interpreter.getClass(cls)
+                        
+                        if (methodClass != null && methodClass.findMethod(name) != null) {
+                            val argCount = countMethodArgs(desc)
+                            val totalArgs = argCount + 1 // Interfaces are always instance methods (have 'this')
+                            val args = Array<Any?>(totalArgs) { null }
+                            
+                            for (j in totalArgs - 1 downTo 0) {
+                                args[j] = frame.pop()
+                            }
+                            val result = interpreter.executeMethod(cls, name, desc, args)
+                            if (!desc.endsWith(")V")) {
+                                frame.push(result)
+                            }
+                        } else {
+                            println("  [VM] WARNING: Unhandled invokeinterface $cls.$name$desc (stub)")
+                            val argCount = countMethodArgs(desc)
+                            for (j in 0 until argCount) {
+                                if (frame.stackSize() > 0) frame.pop()
+                            }
+                            if (frame.stackSize() > 0) frame.pop() // pop "this"
+                            if (!desc.endsWith(")V")) frame.push(0)
                         }
-                        if (frame.stackSize() > 0) frame.pop() // pop "this"
-                        if (!desc.endsWith(")V")) frame.push(0)
                     }
                 }
 
@@ -503,6 +568,18 @@ class ExecutionEngine(
                     @Suppress("UNCHECKED_CAST")
                     val arr = frame.pop() as Array<Any?>
                     arr[index] = value
+                }
+
+                Opcodes.MONITORENTER -> {
+                    val obj = frame.pop()
+                    if (debugMode) println("  [VM] MONITORENTER on $obj")
+                    // Note: Since J2ME emulator is single-threaded, we can safely ignore the lock
+                }
+
+                Opcodes.MONITOREXIT -> {
+                    val obj = frame.pop()
+                    if (debugMode) println("  [VM] MONITOREXIT on $obj")
+                    // Note: Since J2ME emulator is single-threaded, we can safely ignore the unlock
                 }
 
                 else -> {
@@ -586,5 +663,16 @@ class ExecutionEngine(
             }
         }
         return count
+    }
+
+    private fun getDefaultValueForType(desc: String): Any? {
+        if (desc.isEmpty()) return null
+        return when (desc[0]) {
+            'B', 'S', 'I', 'Z', 'C' -> 0
+            'J' -> 0L
+            'F' -> 0.0f
+            'D' -> 0.0
+            else -> null // 'L' (Object) or '[' (Array)
+        }
     }
 }

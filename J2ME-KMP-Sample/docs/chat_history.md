@@ -22,34 +22,34 @@ J2ME-KMP-Sample/
     └── bridge/        # android_jni_bridge.cpp
 ```
 
-### Công việc đã hoàn thành
+### Công việc đã làm (Phase 1, 2, 3)
 
-#### Phase 1 — Native Interop ✅
-- Cấu hình `cinterop` trong `shared/build.gradle.kts` cho iOS
-- Setup SDL2 submodule trong `nativeMain/`
-- Tạo `NativeBridge.kt` (Android: `System.loadLibrary("j2me_native")`)
-- Tạo `android_jni_bridge.cpp` với JNI functions cơ bản
+1. **Phase 1 — Native Interop**:
+   - Cấu hình KMP `cinterop` cho platform iOS và include headers chuẩn.
+   - Thiết lập submodule SDL2 bên trong thư mục `nativeMain/`.
+   - Viết `NativeBridge.kt` với khai báo load thư viện động `System.loadLibrary("j2me_native")` cho Android.
+   - Khởi tạo script JNI C++ cơ bản `android_jni_bridge.cpp`.
 
-#### Phase 2 — Bytecode Interpreter ✅
-- **`ClassFileParser.kt`**: Parse binary `.class` file header, interfaces, fields, methods
-- **`ConstantPoolParser.kt` + `ConstantPoolEntry.kt`**: Parse toàn bộ Constant Pool (18 entry types)
-- **`ClassMembers.kt`**: Đại diện cho `MemberInfo`, `AttributeInfo`, `CodeAttribute`
-- **`JavaClassFile.kt`**: Full class file parser + `JarLoader` mock data builder
-- **`ExecutionFrame.kt`**: Stack frame với operand stack + local variables + PC
-- **`Opcodes.kt`**: Bảng tên 100+ opcode JVM
-- **`ExecutionEngine.kt`**: Vòng lặp fetch-decode-execute với 80+ opcode (arithmetic, branching, method invocation, object/array ops)
-- **`Heap.kt`**: `HeapObject` với `instanceFields` map
+2. **Phase 2 — Bytecode Interpreter (Core JVM)**:
+   - Viết luồng đọc Binary `.class` file tĩnh: `ClassFileParser`, `ConstantPoolParser`, `JavaClassFile`. Parse thành công Magic Number, Constant Pool, Methods, Attributes.
+   - Định nghĩa `ExecutionFrame` cho cấu trúc stack frame (operand stack, local variables, PC).
+   - Ánh xạ hơn 100+ JVM Opcode (chẳng hạn `ILOAD`, `IADD`, `INVOKEVIRTUAL`) trong `Opcodes.kt`.
+   - Triển khai vòng lặp vi xử lý (fetch-decode-execute) bên trong `ExecutionEngine.kt`.
+   - Triển khai bộ nhớ Heap (`Heap.kt`) cho việc cấp phát `HeapObject` (quản lý instance fields).
 
-#### Phase 3 — J2ME API Implementation ✅
-- **`NativeMethodBridge.kt`**: Router intercepting `java.*`/`javax.*` calls
-- **`java/lang/System.kt`** + **`SystemTime.kt`**: `currentTimeMillis()` (KMP expect/actual)
-- **`java/io/PrintStream.kt`**: `println()` stub
-- **`javax/microedition/lcdui/Display.kt`**: `getDisplay()`, `setCurrent()`
-- **`javax/microedition/lcdui/Canvas.kt`**: `repaint()`, `setFullScreenMode()`
-- **`javax/microedition/lcdui/Graphics.kt`**: `setColor()`, `fillRect()`, `drawImage()`
-- **`javax/microedition/lcdui/NativeGraphicsBridge.kt`** (expect/actual): Bridge → SDL2 JNI
-- **`javax/microedition/midlet/MIDlet.kt`**: Base class cho J2ME apps
-- **`demo/game/MyTestGame.kt`**: Demo MIDlet để test
+3. **Phase 3 — J2ME API Implementation (CLDC/MIDP Stubs)**:
+   - Viết `NativeMethodBridge.kt` để can thiệp (intercept) khi Bytecode gọi các hàm của `java.*` hoặc `javax.*`.
+   - Giả lập thư viện chuẩn: `java.lang.System.currentTimeMillis()`, `java.io.PrintStream`.
+   - Giả lập thư viện UI cốt lõi: `javax.microedition.lcdui.Display`, `Canvas`, `Graphics`.
+   - Kết nối `Graphics.fillRect`, `setColor` từ Kotlin gọi ngầm xuống C++ (JNI) qua `NativeGraphicsBridge.kt`.
+   - Tạo `MIDlet.kt` base class và demo cấu trúc app J2ME cơ bản.
+
+### Build Result
+```text
+:shared:compileKotlinAndroid — SUCCESS ✅
+:androidApp:assembleDebug — BUILD SUCCESSFUL ✅
+Bytecode Core Unit Tests (Mock) — COMPLETED ✅
+```
 
 ---
 
@@ -144,23 +144,76 @@ App vẫn crash khi launch sau các bản vá ở Session 2. Cần phân tích s
 
 ---
 
+## Session 5 — 2026-03-06 (Conversation: 5ac33602 part 4)
+
+### Vấn đề / Mục tiêu
+1. Tiến hành Phase 4: Thay thế Emulator mock (console loop) bằng UI thực tế trên Jetpack Compose.
+2. Render graphics mảng byte từ C++ (`gFramebuffer`) trực tiếp lên màn hình điện thoại sử dụng NDK `ANativeWindow` và `SurfaceView`.
+3. Tương thích đa độ phân giải của game J2ME.
+
+### Công việc đã làm
+1. **Dynamic Resolution & Scaling**: 
+   - Sửa đổi C++ bridge (`nativeInitSDL`) để nhận thông số `width, height` chủ động từ Kotlin.
+   - Thêm `nativeSetSurface`. Sử dụng cơ chế hardware scaling tự động thông qua `ANativeWindow_setBuffersGeometry`. C++ tự động copy (`blit`) pixel buffer lên Surface khi `nativePresentScreen` được gọi.
+2. **Compose UI Shell**: 
+   - Thay thế `MainActivity.kt` logic để render `AndroidView` (SurfaceView). Bổ sung cơ chế Letterboxing (`Modifier.aspectRatio`) để chống méo hình.
+   - Khởi chạy Emulator core nằm ngầm bên trong một Thread riêng rẽ (Coroutine `Dispatchers.Default`) để UI thread không bị đơ.
+   - Viết component Component Compose `VirtualKeypad` (Nokia style) giả lập các nút điện thoại chuẩn.
+3. Fix lỗi import `JarLoader` và undeclared `FB_WIDTH/HEIGHT` trong khi port C++ code.
+
+### Build Result
+```
+:androidApp:assembleDebug — BUILD SUCCESSFUL in 5s ✅
+```
+
+---
+
+## Session 6 — 2026-03-06 (Conversation: 5ac33602 part 5)
+
+### Vấn đề / Mục tiêu
+1. Hoàn thành phần còn lại của Phase 4: Implement màn hình Quản lý Thư viện Game (Game Library).
+2. Tích hợp công cụ chọn file (File Picker) để load file `.jar` J2ME thực tế từ thiết bị.
+
+### Công việc đã làm (Phase 4 Mở rộng)
+
+Tôi đã implement xong màn hình Quản lý Thư viện Game và nó đã build thành công rực rỡ!
+
+Tiến độ kỹ thuật:
+
+- **GameLibraryScreen**: Tôi đã tách biệt luồng ứng dụng ra 2 màn hình quản lý trạng thái đơn giản bằng AppScreen Enum (LIBRARY & EMULATOR).
+- **File Picker & SAF**: Áp dụng ActivityResultContracts.GetContent() của Jetpack Compose để mở trình quản lý file hệ thống (SAF) ngay khi bấm dấu +. Mimetype được set là application/java-archive, cho phép bạn chọn thoải mái bất kỳ file .jar J2ME gốc nào ở trong thẻ nhớ hoặc Download Folder.
+- **Internal Storage**: Mọi game được thêm vào sẽ được ứng dụng sao chép (copy) an toàn vào vùng Data nội bộ (filesDir/games/).
+- **Xoá Game**: Đã thêm một nút thùng rác (Thùng Rác đỏ) kế bên tên mỗi game. Khi nhấn vào, file vật lý trong internal disk của Emulator sẽ bị delete khỏi disk.
+- **Auto-parse JAR (JarLoader)**: Code Mock bytebuffer hardcode dở dang trước đó đã bị xoá sổ. JarLoader thực sự dành riêng cho Android (actual class) được tích hợp sử dụng API cốt lõi java.util.zip.ZipFile. Nó tự động đọc và bung file .jar ngoài ra quét đọc file cấu hình META-INF/MANIFEST.MF để truy xuất ra được chính xác tên Class Khởi Chạy nằm ở Property MIDlet-1. Việc này giúp mọi game J2ME tải về đều có thể "tự động" dò dúng file chạy chính mà bạn không cần phải truyền thêm tham số!
+
+### Build Result
+```text
+:androidApp:assembleDebug — BUILD SUCCESSFUL in 12s ✅
+```
+
+---
+
 ## Trạng thái hiện tại (2026-03-06)
 
 ### Hoàn thành
 - [x] Phase 1: Native Interop (JNI + C-Interop)
 - [x] Phase 2: Bytecode Interpreter
 - [x] Phase 3: J2ME APIs (CLDC + MIDP) — crash bugs đã fix
+- [x] **Phase 4**: Compose Multiplatform App Shell
+  - [x] Build Compose App Shell (màn hình chính, letterboxing)
+  - [x] Implement SurfaceView integration (thay software framebuffer bằng NDK `ANativeWindow` thực)
+  - [x] Virtual Keyboard Overlay (Compose)
+  - [x] Game Library (File Picker, Add/Delete Games)
 
 ### Còn lại
-- [ ] **Phase 4**: Compose Multiplatform App Shell
-  - [ ] Build Compose App Shell (màn hình chính, game library)
-  - [ ] Implement SurfaceView integration (thay software framebuffer bằng SDL2 thực)
-  - [ ] Virtual Keyboard Overlay (Compose đè lên SDL2 Surface)
-- [ ] **Phase 5**: Optimization (FastArrayHeapObject)
+- [ ] **Phase 5**: Tương tác Hệ thống & Tối ưu hoá
+  - [ ] Chuyển tiếp Event từ Virtual Keyboard xuống `ExecutionEngine`.
+  - [ ] Ánh xạ Touch Events (Translate Compose Pointer input to J2ME `pointerPressed`).
+  - [ ] Viết màn hình "Game Settings" để người dùng cấu hình độ phân giải J2ME tuỳ chọn.
+  - [ ] Optimization (FastArrayHeapObject)
 
 ### Ghi chú kỹ thuật
-- `MainActivity` hiện gọi `NativeGraphicsBridge.initSDL()` trực tiếp — cần chuyển vào `SurfaceView.Callback.surfaceCreated()` ở Phase 4
-- Software framebuffer (`gFramebuffer[]`) sẵn sàng để `blit` lên `ANativeWindow` khi Phase 4 hoàn thành
+- Tích hợp vòng lặp mô phỏng nằm trong `EmulatorThread` để đảm bảo UI mượt. Game loop C++ sẽ được tối ưu hoá lại tuỳ trường hợp.
 
 ---
 

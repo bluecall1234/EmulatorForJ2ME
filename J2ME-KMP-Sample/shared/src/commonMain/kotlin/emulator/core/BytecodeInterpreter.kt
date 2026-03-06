@@ -11,14 +11,22 @@ import emulator.core.memory.HeapObject
  * On Android, we also interpret (instead of using Dalvik) for consistency.
  */
 interface BytecodeInterpreter {
+    // Set the path of the JAR being executed to allow dynamic class loading
+    var currentJarPath: String
+    
     // Load a class from a byte array (read from a .class file inside a JAR)
     fun loadClass(className: String, bytecode: ByteArray)
     
     // Get a previously loaded class
     fun getClass(className: String): JavaClassFile?
-    
     // Find and execute a method (e.g., startApp)
     fun executeMethod(className: String, methodName: String, args: Array<Any?>): Any?
+    
+    // Find and execute a method matching exact descriptor
+    fun executeMethod(className: String, methodName: String, descriptor: String, args: Array<Any?>): Any?
+    
+    // Ensure <clinit> is called before class is used
+    fun initializeClass(className: String)
     
     // Manually manage Heap for Java objects
     fun allocateObject(className: String): HeapObject
@@ -34,7 +42,9 @@ interface BytecodeInterpreter {
  */
 class SimpleKMPInterpreter : BytecodeInterpreter {
     
+    override var currentJarPath: String = ""
     private val loadedClasses = mutableMapOf<String, JavaClassFile>()
+    private val initializedClasses = mutableSetOf<String>()
 
     override fun loadClass(className: String, bytecode: ByteArray) {
         val classFile = JavaClassFile(className, bytecode)
@@ -46,31 +56,78 @@ class SimpleKMPInterpreter : BytecodeInterpreter {
         println("[Interpreter]   Methods: ${classFile.methods.size}")
     }
 
+    override fun initializeClass(className: String) {
+        if (initializedClasses.contains(className)) return
+        initializedClasses.add(className)
+        
+        val clazz = getClass(className) ?: return
+        
+        // Initialize superclass first
+        val superCls = clazz.resolvedSuperClassName
+        if (superCls != null && superCls != "java/lang/Object") {
+            initializeClass(superCls)
+        }
+        
+        // Find <clinit>
+        val clinit = clazz.methods.find {
+            it.getName(clazz.constantPool) == "<clinit>" &&
+            it.getDescriptor(clazz.constantPool) == "()V"
+        }
+        if (clinit != null) {
+            println("[Interpreter] Invoking <clinit> for $className")
+            executeMethodInternal(className, "<clinit>", clinit, emptyArray())
+        }
+    }
+
     override fun getClass(className: String): JavaClassFile? {
-        // Auto-load a mock class if requested (for testing purposes)
+        // Auto-load class from JAR on demand
         if (!loadedClasses.containsKey(className)) {
-            println("[Interpreter] Warning: Class $className not loaded. Loading mock...")
-            val loader = JarLoader()
-            loadedClasses[className] = loader.loadClassFromJar("", className)
+            if (currentJarPath.isNotEmpty()) {
+                println("[Interpreter] Auto-loading class $className from $currentJarPath...")
+                try {
+                    val loader = JarLoader()
+                    loadedClasses[className] = loader.loadClassFromJar(currentJarPath, className)
+                } catch (e: Exception) {
+                    println("[Interpreter] ERROR: Failed to auto-load class $className: ${e.message}")
+                    return null
+                }
+            } else {
+                println("[Interpreter] Warning: Class $className not loaded and no JAR path set.")
+                return null
+            }
         }
         return loadedClasses[className]
     }
 
     override fun executeMethod(className: String, methodName: String, args: Array<Any?>): Any? {
-        println("[Interpreter] === Executing $className.$methodName ===")
-        
+        // Fallback to finding by name only (might be ambiguous if overloaded)
+        val classFile = getClass(className) ?: return null
+        val methodInfo = classFile.findMethod(methodName) ?: return null
+        return executeMethodInternal(className, methodName, methodInfo, args)
+    }
+
+    override fun executeMethod(className: String, methodName: String, descriptor: String, args: Array<Any?>): Any? {
         val classFile = getClass(className)
         if (classFile == null) {
             println("[Interpreter] ERROR: Class $className could not be loaded")
             return null
         }
         
-        // Find the method
-        val methodInfo = classFile.findMethod(methodName)
+        // Find the method by exact name and descriptor
+        val methodInfo = classFile.methods.find {
+            it.getName(classFile.constantPool) == methodName &&
+            it.getDescriptor(classFile.constantPool) == descriptor
+        }
         if (methodInfo == null) {
-            println("[Interpreter] ERROR: Method $methodName not found in $className")
+            println("[Interpreter] ERROR: Method $methodName$descriptor not found in $className")
             return null
         }
+        
+        return executeMethodInternal(className, methodName, methodInfo, args)
+    }
+
+    private fun executeMethodInternal(className: String, methodName: String, methodInfo: emulator.core.classfile.MemberInfo, args: Array<Any?>): Any? {
+        println("[Interpreter] === Executing $className.$methodName ===")
 
         // Get the Code attribute (contains the bytecode)
         val codeAttr = methodInfo.getCodeAttribute()
@@ -100,6 +157,7 @@ class SimpleKMPInterpreter : BytecodeInterpreter {
         }
 
         // Execute the bytecode
+        val classFile = getClass(className)!!
         val engine = ExecutionEngine(classFile.constantPool, this)
         val result = engine.execute(frame)
 

@@ -6,9 +6,17 @@ package emulator.core.api.javax.microedition.lcdui
  */
 expect object NativeGraphicsBridge {
     /**
-     * Initializes the SDL2 renderer and resources.
+     * Initializes the SDL2 renderer and resources with a specific dimension.
+     * @param width The game's original width (e.g. 240)
+     * @param height The game's original height (e.g. 320)
      */
-    fun initSDL()
+    fun initSDL(width: Int = 240, height: Int = 320)
+
+    /**
+     * Pass the Android Surface to the C++ NDK renderer natively.
+     * Expected to be called only on Android. iOS will ignore this.
+     */
+    fun setSurface(surface: Any?)
 
     /**
      * Clears the current screen to black (or a specified background color)

@@ -74,12 +74,26 @@ object NativeMethodBridge {
 
             // 2. Push a dummy return value for non-void methods
             if (!descriptor.endsWith(")V")) {
-                frame.push(0)
+                frame.push(getDefaultReturnValue(descriptor))
             }
             return true
         }
 
         return false
+    }
+
+    private fun getDefaultReturnValue(descriptor: String): Any? {
+        val retTypeIndex = descriptor.lastIndexOf(')') + 1
+        if (retTypeIndex <= 0 || retTypeIndex >= descriptor.length) return 0
+        
+        return when (descriptor[retTypeIndex]) {
+            'B', 'S', 'I', 'Z', 'C' -> 0
+            'J' -> 0L
+            'F' -> 0.0f
+            'D' -> 0.0
+            'V' -> null // Should not be called for V
+            else -> null // 'L' (Object) or '[' (Array) -> Reference types default to null
+        }
     }
 
     private fun registerJavaLangSystem() {
@@ -138,8 +152,7 @@ object NativeMethodBridge {
         var i = 1 // skip opening '('
         while (i < descriptor.length && descriptor[i] != ')') {
             when (descriptor[i]) {
-                'B', 'C', 'I', 'S', 'Z', 'F' -> { frame.popInt(); i++ }
-                'J', 'D' -> { frame.popLong(); i++ } // long and double (2 slots)
+                'B', 'C', 'I', 'S', 'Z', 'F', 'J', 'D' -> { frame.pop(); i++ }
                 'L' -> {
                     frame.pop()
                     i = descriptor.indexOf(';', i) + 1
