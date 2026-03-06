@@ -40,6 +40,7 @@ object Opcodes {
     const val ILOAD        = 0x15  // Load int from local var (1 byte index)
     const val LLOAD        = 0x16  // Load long
     const val FLOAD        = 0x17  // Load float
+    const val DLOAD        = 0x18  // Load double
     const val ALOAD        = 0x19  // Load reference
     const val ILOAD_0      = 0x1A  // Load int from local var 0
     const val ILOAD_1      = 0x1B  // Load int from local var 1
@@ -47,6 +48,16 @@ object Opcodes {
     const val ILOAD_3      = 0x1D  // Load int from local var 3
     const val LLOAD_0      = 0x1E  // Load long from local var 0
     const val LLOAD_1      = 0x1F  // Load long from local var 1
+    const val LLOAD_2      = 0x20  // Load long from local var 2
+    const val LLOAD_3      = 0x21  // Load long from local var 3
+    const val FLOAD_0      = 0x22  // Load float from local var 0
+    const val FLOAD_1      = 0x23  // Load float from local var 1
+    const val FLOAD_2      = 0x24  // Load float from local var 2
+    const val FLOAD_3      = 0x25  // Load float from local var 3
+    const val DLOAD_0      = 0x26  // Load double from local var 0
+    const val DLOAD_1      = 0x27  // Load double from local var 1
+    const val DLOAD_2      = 0x28  // Load double from local var 2
+    const val DLOAD_3      = 0x29  // Load double from local var 3
     const val ALOAD_0      = 0x2A  // Load reference from local var 0 (usually "this")
     const val ALOAD_1      = 0x2B  // Load reference from local var 1
     const val ALOAD_2      = 0x2C  // Load reference from local var 2
@@ -206,8 +217,15 @@ object Opcodes {
             BIPUSH -> "bipush"; SIPUSH -> "sipush"
             LDC -> "ldc"; LDC_W -> "ldc_w"; LDC2_W -> "ldc2_w"
             ILOAD -> "iload"; ALOAD -> "aload"
+            LLOAD -> "lload"; FLOAD -> "fload"; DLOAD -> "dload"
             ILOAD_0 -> "iload_0"; ILOAD_1 -> "iload_1"
             ILOAD_2 -> "iload_2"; ILOAD_3 -> "iload_3"
+            LLOAD_0 -> "lload_0"; LLOAD_1 -> "lload_1"
+            LLOAD_2 -> "lload_2"; LLOAD_3 -> "lload_3"
+            FLOAD_0 -> "fload_0"; FLOAD_1 -> "fload_1"
+            FLOAD_2 -> "fload_2"; FLOAD_3 -> "fload_3"
+            DLOAD_0 -> "dload_0"; DLOAD_1 -> "dload_1"
+            DLOAD_2 -> "dload_2"; DLOAD_3 -> "dload_3"
             ALOAD_0 -> "aload_0"; ALOAD_1 -> "aload_1"
             ALOAD_2 -> "aload_2"; ALOAD_3 -> "aload_3"
             ISTORE -> "istore"; ASTORE -> "astore"
