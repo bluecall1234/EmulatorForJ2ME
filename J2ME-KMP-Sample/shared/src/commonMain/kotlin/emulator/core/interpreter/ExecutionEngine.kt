@@ -377,6 +377,61 @@ class ExecutionEngine(
                     val arr = frame.pop() as ByteArray
                     arr[index] = value.toByte()
                 }
+                Opcodes.CALOAD -> {
+                    val index = frame.popInt()
+                    val arr = frame.pop() as CharArray
+                    frame.push(arr[index].code)
+                }
+                Opcodes.CASTORE -> {
+                    val value = frame.popInt()
+                    val index = frame.popInt()
+                    val arr = frame.pop() as CharArray
+                    arr[index] = value.toChar()
+                }
+                Opcodes.SALOAD -> {
+                    val index = frame.popInt()
+                    val arr = frame.pop() as ShortArray
+                    frame.push(arr[index].toInt())
+                }
+                Opcodes.SASTORE -> {
+                    val value = frame.popInt()
+                    val index = frame.popInt()
+                    val arr = frame.pop() as ShortArray
+                    arr[index] = value.toShort()
+                }
+                Opcodes.LALOAD -> {
+                    val index = frame.popInt()
+                    val arr = frame.pop() as LongArray
+                    frame.push(arr[index])
+                }
+                Opcodes.LASTORE -> {
+                    val value = frame.popLong()
+                    val index = frame.popInt()
+                    val arr = frame.pop() as LongArray
+                    arr[index] = value
+                }
+                Opcodes.FALOAD -> {
+                    val index = frame.popInt()
+                    val arr = frame.pop() as FloatArray
+                    frame.push(arr[index])
+                }
+                Opcodes.FASTORE -> {
+                    val value = frame.pop() as Float
+                    val index = frame.popInt()
+                    val arr = frame.pop() as FloatArray
+                    arr[index] = value
+                }
+                Opcodes.DALOAD -> {
+                    val index = frame.popInt()
+                    val arr = frame.pop() as DoubleArray
+                    frame.push(arr[index])
+                }
+                Opcodes.DASTORE -> {
+                    val value = frame.pop() as Double
+                    val index = frame.popInt()
+                    val arr = frame.pop() as DoubleArray
+                    arr[index] = value
+                }
 
                 // === OBJECT ALLOCATION & FIELD ACCESS ===
                 Opcodes.NEW -> {

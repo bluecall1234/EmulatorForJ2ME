@@ -160,13 +160,21 @@ object Opcodes {
 
     // === Array access ===
     const val IALOAD       = 0x2E  // Load int from array
+    const val LALOAD       = 0x2F  // Load long from array
+    const val FALOAD       = 0x30  // Load float from array
+    const val DALOAD       = 0x31  // Load double from array
     const val AALOAD       = 0x32  // Load reference from array
-    const val BALOAD       = 0x33  // Load byte from array
+    const val BALOAD       = 0x33  // Load byte/boolean from array
     const val CALOAD       = 0x34  // Load char from array
+    const val SALOAD       = 0x35  // Load short from array
     const val IASTORE      = 0x4F  // Store int to array
+    const val LASTORE      = 0x50  // Store long to array
+    const val FASTORE      = 0x51  // Store float to array
+    const val DASTORE      = 0x52  // Store double to array
     const val AASTORE      = 0x53  // Store reference to array
-    const val BASTORE      = 0x54  // Store byte to array
+    const val BASTORE      = 0x54  // Store byte/boolean to array
     const val CASTORE      = 0x55  // Store char to array
+    const val SASTORE      = 0x56  // Store short to array
 
     // === Null check ===
     const val IFNULL       = 0xC6  // Branch if reference is null
@@ -201,6 +209,12 @@ object Opcodes {
             FSTORE_2 -> "fstore_2"; FSTORE_3 -> "fstore_3"
             ASTORE_0 -> "astore_0"; ASTORE_1 -> "astore_1"
             ASTORE_2 -> "astore_2"; ASTORE_3 -> "astore_3"
+            IALOAD -> "iaload"; LALOAD -> "laload"; FALOAD -> "faload"
+            DALOAD -> "daload"; AALOAD -> "aaload"; BALOAD -> "baload"
+            CALOAD -> "caload"; SALOAD -> "saload"
+            IASTORE -> "iastore"; LASTORE -> "lastore"; FASTORE -> "fastore"
+            DASTORE -> "dastore"; AASTORE -> "aastore"; BASTORE -> "bastore"
+            CASTORE -> "castore"; SASTORE -> "sastore"
             POP -> "pop"; DUP -> "dup"; SWAP -> "swap"
             IADD -> "iadd"; ISUB -> "isub"; IMUL -> "imul"
             IDIV -> "idiv"; IREM -> "irem"; INEG -> "ineg"
