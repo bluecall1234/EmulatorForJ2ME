@@ -237,12 +237,23 @@ class ConstantPool(val entries: List<ConstantPoolEntry>) {
      */
     fun resolveMethodRef(index: Int): Triple<String, String, String> {
         val entry = entries[index]
-        if (entry is ConstantPoolEntry.MethodRef) {
-            val className = getClassName(entry.classIndex)
-            val (methodName, descriptor) = getNameAndType(entry.nameAndTypeIndex)
-            return Triple(className, methodName, descriptor)
+        // FIX #5: Handle both MethodRef (tag 10) AND InterfaceMethodRef (tag 11)
+        // INVOKEINTERFACE uses InterfaceMethodRef, not MethodRef
+        return when (entry) {
+            is ConstantPoolEntry.MethodRef -> {
+                val className = getClassName(entry.classIndex)
+                val (methodName, descriptor) = getNameAndType(entry.nameAndTypeIndex)
+                Triple(className, methodName, descriptor)
+            }
+            is ConstantPoolEntry.InterfaceMethodRef -> {
+                val className = getClassName(entry.classIndex)
+                val (methodName, descriptor) = getNameAndType(entry.nameAndTypeIndex)
+                Triple(className, methodName, descriptor)
+            }
+            else -> throw IllegalArgumentException(
+                "Expected MethodRef or InterfaceMethodRef at index $index, got ${entry::class.simpleName}"
+            )
         }
-        throw IllegalArgumentException("Constant pool entry at index $index is not MethodRef")
     }
 
     /**

@@ -120,6 +120,14 @@ class ExecutionEngine(
                 Opcodes.ISTORE_1 -> frame.locals[1] = frame.pop()
                 Opcodes.ISTORE_2 -> frame.locals[2] = frame.pop()
                 Opcodes.ISTORE_3 -> frame.locals[3] = frame.pop()
+                Opcodes.LSTORE_0 -> frame.locals[0] = frame.pop()
+                Opcodes.LSTORE_1 -> frame.locals[1] = frame.pop()
+                Opcodes.LSTORE_2 -> frame.locals[2] = frame.pop()
+                Opcodes.LSTORE_3 -> frame.locals[3] = frame.pop()
+                Opcodes.FSTORE_0 -> frame.locals[0] = frame.pop()
+                Opcodes.FSTORE_1 -> frame.locals[1] = frame.pop()
+                Opcodes.FSTORE_2 -> frame.locals[2] = frame.pop()
+                Opcodes.FSTORE_3 -> frame.locals[3] = frame.pop()
                 Opcodes.ASTORE_0 -> frame.locals[0] = frame.pop()
                 Opcodes.ASTORE_1 -> frame.locals[1] = frame.pop()
                 Opcodes.ASTORE_2 -> frame.locals[2] = frame.pop()
@@ -434,11 +442,26 @@ class ExecutionEngine(
                     val _count = frame.readU1() // argument count (redundant)
                     val _zero = frame.readU1()  // always 0
                     val (cls, name, desc) = constantPool.resolveMethodRef(index)
-                    if (debugMode) println("  [VM] invokeinterface $cls.$name$desc (stub)")
-                    val argCount = countMethodArgs(desc)
-                    for (j in 0 until argCount) frame.pop()
-                    frame.pop() // pop "this"
-                    if (!desc.endsWith(")V")) frame.push(0)
+                    if (debugMode) println("  [VM] invokeinterface $cls.$name$desc")
+
+                    // FIX #7: Route through NativeMethodBridge (same as INVOKEVIRTUAL)
+                    val isHandled = emulator.core.api.NativeMethodBridge.callNativeMethod(
+                        className = cls,
+                        methodName = name,
+                        descriptor = desc,
+                        frame = frame,
+                        isStatic = false
+                    )
+
+                    if (!isHandled) {
+                        println("  [VM] WARNING: Unhandled invokeinterface $cls.$name$desc (stub)")
+                        val argCount = countMethodArgs(desc)
+                        for (j in 0 until argCount) {
+                            if (frame.stackSize() > 0) frame.pop()
+                        }
+                        if (frame.stackSize() > 0) frame.pop() // pop "this"
+                        if (!desc.endsWith(")V")) frame.push(0)
+                    }
                 }
 
                 Opcodes.CHECKCAST -> {

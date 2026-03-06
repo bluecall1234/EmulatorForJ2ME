@@ -97,6 +97,53 @@ App crash khi launch trên Android emulator, liên quan đến phần **J2ME Gra
 
 ---
 
+## Session 3 — 2026-03-06 (Conversation: 5ac33602 part 2)
+
+### Vấn đề báo cáo
+App vẫn crash khi launch sau các bản vá ở Session 2. Cần phân tích sâu hơn nguyên nhân trong interpreter và JNI execution flow.
+
+### Root Cause Analysis (Bugs #5 - #7)
+
+| # | Bug | File | Mức độ |
+|---|-----|------|--------|
+| 5 | `ConstantPool.resolveMethodRef()` crash với `IllegalArgumentException` khi gặp `InterfaceMethodRef` | `ConstantPoolParser.kt` | 🔴 CRITICAL |
+| 6 | `MainActivity` không catch exceptions, gây silent crash | `MainActivity.kt` | 🟠 HIGH |
+| 7 | `INVOKEINTERFACE` sử dụng logic pop args/`this` không an toàn | `ExecutionEngine.kt` | 🟡 MEDIUM |
+
+### Fixes đã thực hiện
+
+- **Fix #5**: Cập nhật `resolveMethodRef()` nhận diện và xử lý cả `MethodRef` và `InterfaceMethodRef`.
+- **Fix #6**: Wrap logic `onCreate` của `MainActivity` trong khối `try-catch`, in ra màn hình Compose nếu có lỗi để tiện debug.
+- **Fix #7**: Dẫn luồng `INVOKEINTERFACE` qua `NativeMethodBridge` giống như `INVOKEVIRTUAL`, và thêm kiểm tra `frame.stackSize() > 0` trước khi pop.
+
+### Build Result
+```
+:androidApp:assembleDebug — BUILD SUCCESSFUL in 10s ✅
+```
+
+---
+
+## Session 4 — 2026-03-06 (Conversation: 5ac33602 part 3)
+
+### Vấn đề / Mục tiêu
+1. Lỗi `Unimplemented opcode: 0x3f` khi chạy lệnh `Long Store`
+2. Người dùng muốn xuất `println` ra file `.txt` đặt trong app data directory để dễ debug trên máy tính (Android & iOS).
+
+### Root Cause Analysis & Fixes
+- **Fix Opcode 0x3F**: Chèn `LSTORE_0..3` và `FSTORE_0..3` vào constant sheet `Opcodes.kt` và thêm logic vào vòng lặp `while` tại `ExecutionEngine.kt`.
+- **Feature: Dual PrintStream KMP Logger**:
+  - `shared/src/commonMain/kotlin/emulator/core/Logger.kt`: Khai báo `expect fun setupFileLogging(context: Any?)`
+  - `shared/src/androidMain/kotlin/emulator/core/Logger.kt`: Clone 2 luồng `System.out` và `System.err`, vừa in vào Logcat, vừa viết vào tệp `/sdcard/Android/data/com.example.j2me.android/files/emulator_log.txt`. Ghi đè file mỗi lần bật app.
+  - `shared/src/iosMain/kotlin/emulator/core/Logger.kt`: Stub `println` chờ C-Interop `freopen` trong Phase tới.
+  - `MainActivity.kt`: Khởi tạo hàm `setupFileLogging(this)` tại `onCreate`.
+
+### Build Result
+```
+:androidApp:assembleDebug — BUILD SUCCESSFUL in 8s ✅
+```
+
+---
+
 ## Trạng thái hiện tại (2026-03-06)
 
 ### Hoàn thành

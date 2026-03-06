@@ -66,6 +66,16 @@ object Opcodes {
     const val ASTORE_2     = 0x4D  // Store reference to local var 2
     const val ASTORE_3     = 0x4E  // Store reference to local var 3
 
+    // Long & Float store
+    const val LSTORE_0     = 0x3F  // Store long to local var 0
+    const val LSTORE_1     = 0x40  // Store long to local var 1
+    const val LSTORE_2     = 0x41  // Store long to local var 2
+    const val LSTORE_3     = 0x42  // Store long to local var 3
+    const val FSTORE_0     = 0x43  // Store float to local var 0
+    const val FSTORE_1     = 0x44  // Store float to local var 1
+    const val FSTORE_2     = 0x45  // Store float to local var 2
+    const val FSTORE_3     = 0x46  // Store float to local var 3
+
     // === Stack manipulation ===
     const val POP          = 0x57  // Pop top value from stack
     const val POP2         = 0x58  // Pop top 2 values
@@ -177,7 +187,12 @@ object Opcodes {
             ISTORE -> "istore"; ASTORE -> "astore"
             ISTORE_0 -> "istore_0"; ISTORE_1 -> "istore_1"
             ISTORE_2 -> "istore_2"; ISTORE_3 -> "istore_3"
+            LSTORE_0 -> "lstore_0"; LSTORE_1 -> "lstore_1"
+            LSTORE_2 -> "lstore_2"; LSTORE_3 -> "lstore_3"
+            FSTORE_0 -> "fstore_0"; FSTORE_1 -> "fstore_1"
+            FSTORE_2 -> "fstore_2"; FSTORE_3 -> "fstore_3"
             ASTORE_0 -> "astore_0"; ASTORE_1 -> "astore_1"
+            ASTORE_2 -> "astore_2"; ASTORE_3 -> "astore_3"
             POP -> "pop"; DUP -> "dup"; SWAP -> "swap"
             IADD -> "iadd"; ISUB -> "isub"; IMUL -> "imul"
             IDIV -> "idiv"; IREM -> "irem"; INEG -> "ineg"
