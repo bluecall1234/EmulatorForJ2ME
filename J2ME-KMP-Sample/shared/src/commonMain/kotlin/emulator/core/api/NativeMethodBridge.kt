@@ -172,6 +172,42 @@ object NativeMethodBridge {
             frame.push(sbObj)
         }
 
+        nativeMethods["java/lang/StringBuffer.append:(F)Ljava/lang/StringBuffer;"] = { frame ->
+            val f = frame.pop() as? Float ?: 0.0f
+            val sbObj = frame.pop() as? emulator.core.memory.HeapObject 
+                ?: throw RuntimeException("NullPointerException: StringBuffer append(Float) called on null or invalid object")
+            val current = sbObj.instanceFields["value"] as? String ?: ""
+            sbObj.instanceFields["value"] = current + f.toString()
+            frame.push(sbObj)
+        }
+
+        nativeMethods["java/lang/StringBuffer.append:(J)Ljava/lang/StringBuffer;"] = { frame ->
+            val l = frame.popLong()
+            val sbObj = frame.pop() as? emulator.core.memory.HeapObject 
+                ?: throw RuntimeException("NullPointerException: StringBuffer append(Long) called on null or invalid object")
+            val current = sbObj.instanceFields["value"] as? String ?: ""
+            sbObj.instanceFields["value"] = current + l.toString()
+            frame.push(sbObj)
+        }
+
+        nativeMethods["java/lang/StringBuffer.append:(C)Ljava/lang/StringBuffer;"] = { frame ->
+            val c = frame.popInt().toChar()
+            val sbObj = frame.pop() as? emulator.core.memory.HeapObject 
+                ?: throw RuntimeException("NullPointerException: StringBuffer append(Char) called on null or invalid object")
+            val current = sbObj.instanceFields["value"] as? String ?: ""
+            sbObj.instanceFields["value"] = current + c.toString()
+            frame.push(sbObj)
+        }
+        
+        nativeMethods["java/lang/StringBuffer.append:(Z)Ljava/lang/StringBuffer;"] = { frame ->
+            val b = frame.popInt() != 0
+            val sbObj = frame.pop() as? emulator.core.memory.HeapObject 
+                ?: throw RuntimeException("NullPointerException: StringBuffer append(Boolean) called on null or invalid object")
+            val current = sbObj.instanceFields["value"] as? String ?: ""
+            sbObj.instanceFields["value"] = current + b.toString()
+            frame.push(sbObj)
+        }
+
         nativeMethods["java/lang/StringBuffer.toString:()Ljava/lang/String;"] = { frame ->
             val sbObj = frame.pop() as? emulator.core.memory.HeapObject 
                 ?: throw RuntimeException("NullPointerException: StringBuffer toString called on null or invalid object")
