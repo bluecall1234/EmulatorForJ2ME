@@ -24,6 +24,9 @@ internal object NativeGraphicsBridgeJni {
     external fun nativeClearScreen()
     external fun nativePresentScreen()
     external fun nativeFillRect(x: Int, y: Int, w: Int, h: Int, r: Int, g: Int, b: Int, a: Int)
+    external fun nativeSetClip(x: Int, y: Int, w: Int, h: Int)
+    external fun nativeDrawImage(imageRgb: IntArray, imgW: Int, imgH: Int, x: Int, y: Int, anchor: Int)
+    external fun nativeDrawString(text: String, x: Int, y: Int, color: Int)
 }
 
 actual object NativeGraphicsBridge {
@@ -55,5 +58,17 @@ actual object NativeGraphicsBridge {
         val g = (color shr 8) and 0xFF
         val b = color and 0xFF
         NativeGraphicsBridgeJni.nativeFillRect(x, y, w, h, r, g, b, alpha)
+    }
+
+    actual fun setClip(x: Int, y: Int, w: Int, h: Int) {
+        NativeGraphicsBridgeJni.nativeSetClip(x, y, w, h)
+    }
+
+    actual fun drawImage(imageRgb: IntArray, imgW: Int, imgH: Int, x: Int, y: Int, anchor: Int) {
+        NativeGraphicsBridgeJni.nativeDrawImage(imageRgb, imgW, imgH, x, y, anchor)
+    }
+
+    actual fun drawString(text: String, x: Int, y: Int, color: Int) {
+        NativeGraphicsBridgeJni.nativeDrawString(text, x, y, color)
     }
 }

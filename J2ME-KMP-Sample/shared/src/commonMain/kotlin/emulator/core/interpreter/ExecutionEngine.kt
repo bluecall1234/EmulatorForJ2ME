@@ -647,6 +647,54 @@ class ExecutionEngine(
                     frame.push(if (obj != null) 1 else 0)
                 }
 
+                Opcodes.TABLESWITCH -> {
+                    // Padding bytes to align the PC to a multiple of 4
+                    val padding = (4 - (frame.pc % 4)) % 4
+                    for (i in 0 until padding) {
+                        frame.readU1()
+                    }
+                    val defaultOffset: Int = frame.readU4().toInt()
+                    val low: Int = frame.readU4().toInt()
+                    val high: Int = frame.readU4().toInt()
+                    val index: Int = frame.popInt()
+
+                    if (index in low..high) {
+                        val offsetToShift = (index - low) * 4
+                        for (i in 0 until offsetToShift) {
+                            frame.readU1()
+                        }
+                        val jumpOffset: Int = frame.readU4().toInt()
+                        frame.pc = opcodePC + jumpOffset
+                    } else {
+                        frame.pc = opcodePC + defaultOffset
+                    }
+                }
+
+                Opcodes.LOOKUPSWITCH -> {
+                    val padding = (4 - (frame.pc % 4)) % 4
+                    for (i in 0 until padding) {
+                        frame.readU1()
+                    }
+                    val defaultOffset: Int = frame.readU4().toInt()
+                    val npairs: Int = frame.readU4().toInt()
+                    val key: Int = frame.popInt()
+                    var matched = false
+
+                    for (i in 0 until npairs) {
+                        val match: Int = frame.readU4().toInt()
+                        val offset: Int = frame.readU4().toInt()
+
+                        if (match == key) {
+                            frame.pc = opcodePC + offset
+                            matched = true
+                            break
+                        }
+                    }
+                    if (!matched) {
+                        frame.pc = opcodePC + defaultOffset
+                    }
+                }
+
                 Opcodes.ATHROW -> {
                     val exception = frame.pop()
                     throw RuntimeException("J2ME Exception thrown: $exception")

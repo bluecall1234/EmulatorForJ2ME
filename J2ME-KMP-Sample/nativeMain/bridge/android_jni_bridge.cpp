@@ -158,6 +158,71 @@ Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeFi
 }
 
 // ============================================================
+// nativeSetClip
+// ============================================================
+extern "C" JNIEXPORT void JNICALL
+Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeSetClip(
+    JNIEnv *env, jobject /* this */, jint x, jint y, jint w, jint h) {
+  // Stub for now. Full clipping requires modifying fillRect/drawImage
+  LOGD("nativeSetClip(%d,%d,%d,%d) Stubbed", x, y, w, h);
+}
+
+// ============================================================
+// nativeDrawImage
+// ============================================================
+extern "C" JNIEXPORT void JNICALL
+Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDrawImage(
+    JNIEnv *env, jobject /* this */, jintArray imageRgb, jint imgW, jint imgH,
+    jint x, jint y, jint anchor) {
+
+  if (!gInitialized || gFramebuffer == nullptr || imageRgb == nullptr)
+    return;
+
+  jint *pixels = env->GetIntArrayElements(imageRgb, nullptr);
+  jsize len = env->GetArrayLength(imageRgb);
+
+  if (len < imgW * imgH) {
+    env->ReleaseIntArrayElements(imageRgb, pixels, JNI_ABORT);
+    return;
+  }
+
+  // Adjust X/Y based on anchor (stubbed to Top-Left for now)
+  int startX = x;
+  int startY = y;
+
+  for (int py = 0; py < imgH; py++) {
+    for (int px = 0; px < imgW; px++) {
+      int screenX = startX + px;
+      int screenY = startY + py;
+
+      if (screenX >= 0 && screenX < gWidth && screenY >= 0 &&
+          screenY < gHeight) {
+        uint32_t color = pixels[py * imgW + px];
+        // Simple alpha blending: if alpha is > 0
+        uint8_t a = (color >> 24) & 0xFF;
+        if (a > 128) {
+          gFramebuffer[screenY * gWidth + screenX] = color;
+        }
+      }
+    }
+  }
+
+  env->ReleaseIntArrayElements(imageRgb, pixels, JNI_ABORT);
+  LOGD("nativeDrawImage rendered %dx%d into (%d,%d)", imgW, imgH, x, y);
+}
+
+// ============================================================
+// nativeDrawString
+// ============================================================
+extern "C" JNIEXPORT void JNICALL
+Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDrawString(
+    JNIEnv *env, jobject /* this */, jstring text, jint x, jint y, jint color) {
+  // Full TTF rendering via FreeType/SDL_ttf is heavy. We stub or draw
+  // rectangles for now.
+  LOGD("nativeDrawString at (%d,%d) color=0x%08X", x, y, color);
+}
+
+// ============================================================
 // Legacy bridge — kept for backward compat with old NativeBridge.initSDL()
 // ============================================================
 extern "C" JNIEXPORT void JNICALL

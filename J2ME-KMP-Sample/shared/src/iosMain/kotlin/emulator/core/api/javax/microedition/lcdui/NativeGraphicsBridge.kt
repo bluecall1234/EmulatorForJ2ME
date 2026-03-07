@@ -29,4 +29,16 @@ actual object NativeGraphicsBridge {
         // TODO: call sdl2.SDL_SetRenderDrawColor and sdl2.SDL_RenderFillRect
         println("[iOS NativeGraphicsBridge] fillRect")
     }
+
+    actual fun setClip(x: Int, y: Int, w: Int, h: Int) {
+        println("[iOS NativeGraphicsBridge] setClip")
+    }
+
+    actual fun drawImage(imageRgb: IntArray, imgW: Int, imgH: Int, x: Int, y: Int, anchor: Int) {
+        println("[iOS NativeGraphicsBridge] drawImage")
+    }
+
+    actual fun drawString(text: String, x: Int, y: Int, color: Int) {
+        println("[iOS NativeGraphicsBridge] drawString")
+    }
 }

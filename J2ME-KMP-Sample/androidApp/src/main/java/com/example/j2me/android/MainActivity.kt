@@ -12,10 +12,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import emulator.core.SimpleKMPInterpreter
+import emulator.core.BytecodeInterpreter
 import emulator.core.JarLoader
 import emulator.core.api.javax.microedition.lcdui.NativeGraphicsBridge
 import kotlinx.coroutines.CoroutineScope
@@ -43,7 +46,15 @@ import androidx.compose.material.icons.filled.Delete
 enum class AppScreen { LIBRARY, EMULATOR }
 
 // Game Data Model
-data class GameInfo(val id: String, val name: String, val filePath: String, val mainClass: String?, val touchSupport: Boolean = false)
+data class GameInfo(
+    val id: String, 
+    val name: String, 
+    val filePath: String, 
+    val mainClass: String?, 
+    var touchSupport: Boolean = false,
+    var screenWidth: Int = 240,
+    var screenHeight: Int = 320
+)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -235,6 +246,8 @@ fun GameLibraryScreen(
         }
     }
 
+    var showDialog by remember { mutableStateOf<GameInfo?>(null) }
+
     Scaffold(
         topBar = {
             TopAppBar(title = { Text("J2ME Game Library") })
@@ -245,6 +258,51 @@ fun GameLibraryScreen(
             }
         }
     ) { padding ->
+        if (showDialog != null) {
+            val game = showDialog!!
+            var width by remember { mutableStateOf(game.screenWidth.toString()) }
+            var height by remember { mutableStateOf(game.screenHeight.toString()) }
+            var touch by remember { mutableStateOf(game.touchSupport) }
+
+            AlertDialog(
+                onDismissRequest = { showDialog = null },
+                title = { Text("Launch Options") },
+                text = {
+                    Column {
+                        OutlinedTextField(
+                            value = width,
+                            onValueChange = { width = it },
+                            label = { Text("Screen Width") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = height,
+                            onValueChange = { height = it },
+                            label = { Text("Screen Height") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = touch, onCheckedChange = { touch = it })
+                            Text("Enable Touch Pointer Events")
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        game.screenWidth = width.toIntOrNull() ?: 240
+                        game.screenHeight = height.toIntOrNull() ?: 320
+                        game.touchSupport = touch
+                        showDialog = null
+                        onGameSelected(game)
+                    }) { Text("Launch Game") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDialog = null }) { Text("Cancel") }
+                }
+            )
+        }
         if (games.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Text("No games added yet. Click + to add a .jar file.")
@@ -256,7 +314,7 @@ fun GameLibraryScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(8.dp)
-                            .clickable { onGameSelected(game) },
+                            .clickable { showDialog = game },
                         elevation = 4.dp
                     ) {
                         Row(
@@ -286,9 +344,8 @@ fun GameLibraryScreen(
 @Composable
 fun EmulatorScreen(game: GameInfo, onBack: () -> Unit) {
     var errorLog by remember { mutableStateOf<String?>(null) }
-    // Hardcoded resolution for now, will be dynamic in future game settings
-    val gameWidth = 240
-    val gameHeight = 320
+    val gameWidth = game.screenWidth
+    val gameHeight = game.screenHeight
 
     Column(
         modifier = Modifier
@@ -345,6 +402,32 @@ fun EmulatorScreen(game: GameInfo, onBack: () -> Unit) {
                     },
                     // Phase 4: Aspect Ratio Preserving (Letterboxing)
                     modifier = Modifier.aspectRatio(gameWidth.toFloat() / gameHeight.toFloat())
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val pos = event.changes.first().position
+                                    // Scale coordinates from Compose Canvas to Game Resolution
+                                    val scaleX = gameWidth / size.width.toFloat()
+                                    val scaleY = gameHeight / size.height.toFloat()
+                                    val gameX = (pos.x * scaleX).toInt()
+                                    val gameY = (pos.y * scaleY).toInt()
+
+                                    when (event.type) {
+                                        PointerEventType.Press -> {
+                                            emulator.core.BytecodeInterpreter.injectPointerEvent(0, gameX, gameY)
+                                        }
+                                        PointerEventType.Release -> {
+                                            emulator.core.BytecodeInterpreter.injectPointerEvent(1, gameX, gameY)
+                                        }
+                                        PointerEventType.Move -> {
+                                            // Optional: J2ME allows Dragged events
+                                            emulator.core.BytecodeInterpreter.injectPointerEvent(2, gameX, gameY)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                 )
             }
 
@@ -476,6 +559,7 @@ private fun startGameLoop(game: GameInfo, width: Int, height: Int, onError: (Str
             NativeGraphicsBridge.initSDL(width, height)
             
             val interpreter = SimpleKMPInterpreter()
+            BytecodeInterpreter.activeInterpreter = interpreter
             interpreter.currentJarPath = game.filePath // Fix for Phase 5.2 dynamic class loading
             val loader = JarLoader()
             val mainClassToLoad = game.mainClass ?: throw Exception("META-INF/MANIFEST.MF does not contain MIDlet-1")

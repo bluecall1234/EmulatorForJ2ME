@@ -59,8 +59,49 @@ object Graphics {
         val imageObj = frame.pop() as? HeapObject
         val thisGraphics = frame.pop() as? HeapObject
 
-        // TODO (Phase 4): Bridge this call to SDL2 texture drawing
-        println("[J2ME Graphics] drawImage(img=$imageObj, x=$x, y=$y, anchor=$anchor)")
+        if (imageObj == null) return
+        val w = imageObj.instanceFields["width:I"] as? Int ?: 0
+        val h = imageObj.instanceFields["height:I"] as? Int ?: 0
+        val rgb = imageObj.instanceFields["rgb:[I"] as? IntArray
+
+        if (rgb != null && rgb.isNotEmpty()) {
+            NativeGraphicsBridge.drawImage(rgb, w, h, x, y, anchor)
+            println("[J2ME Graphics] drawImage(img=$imageObj, x=$x, y=$y, anchor=$anchor) size=${w}x${h}")
+        } else {
+            println("[J2ME Graphics] WARNING: drawImage with missing rgb array!")
+        }
+    }
+
+    /**
+     * javax.microedition.lcdui.Graphics.drawString(Ljava/lang/String;III)V
+     */
+    fun drawString(frame: ExecutionFrame) {
+        val anchor = frame.popInt()
+        val y = frame.popInt()
+        val x = frame.popInt()
+        val strObj = frame.pop() as? HeapObject
+        val thisGraphics = frame.pop() as? HeapObject
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0
+
+        val chars = strObj?.instanceFields?.get("value:[C") as? CharArray
+        val text = chars?.concatToString() ?: ""
+
+        NativeGraphicsBridge.drawString(text, x, y, color)
+        println("[J2ME Graphics] drawString(\"$text\", x=$x, y=$y, anchor=$anchor) color=0x${color.toString(16)}")
+    }
+
+    /**
+     * javax.microedition.lcdui.Graphics.setClip(IIII)V
+     */
+    fun setClip(frame: ExecutionFrame) {
+        val height = frame.popInt()
+        val width = frame.popInt()
+        val y = frame.popInt()
+        val x = frame.popInt()
+        val thisGraphics = frame.pop() as? HeapObject
+
+        NativeGraphicsBridge.setClip(x, y, width, height)
+        println("[J2ME Graphics] setClip(x=$x, y=$y, w=$width, h=$height)")
     }
 }
 

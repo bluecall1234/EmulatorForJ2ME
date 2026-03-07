@@ -25,12 +25,17 @@ object Display {
         println("[J2ME Display] getDisplay() called for MIDlet $midletRef")
     }
 
+    // Store the currently active Displayable (Canvas or Form)
+    var activeDisplayable: HeapObject? = null
+
     /**
      * javax.microedition.lcdui.Display.setCurrent(Ljavax/microedition/lcdui/Displayable;)V
      */
     fun setCurrent(frame: ExecutionFrame) {
         val displayableRef = frame.pop() as? HeapObject // The Canvas or Form
         val thisDisplay = frame.pop() as? HeapObject // The Display instance
+        
+        activeDisplayable = displayableRef
         
         // TODO: This is where we tell our CMP / SDL2 window to start rendering
         // this specific Displayable object.

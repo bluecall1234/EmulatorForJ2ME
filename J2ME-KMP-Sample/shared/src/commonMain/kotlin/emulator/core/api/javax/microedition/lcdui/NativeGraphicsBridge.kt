@@ -32,4 +32,20 @@ expect object NativeGraphicsBridge {
      * Draws a filled rectangle on the screen.
      */
     fun fillRect(x: Int, y: Int, w: Int, h: Int, color: Int)
+
+    /**
+     * Set clipping region
+     */
+    fun setClip(x: Int, y: Int, w: Int, h: Int)
+
+    /**
+     * Draw Image (stubbed for now with dimensions and ARGB array if needed, 
+     * but we'll pass simplified args for the JNI bridge)
+     */
+    fun drawImage(imageRgb: IntArray, imgW: Int, imgH: Int, x: Int, y: Int, anchor: Int)
+
+    /**
+     * Draw String (stubbed to native font rendering or ignoring)
+     */
+    fun drawString(text: String, x: Int, y: Int, color: Int)
 }

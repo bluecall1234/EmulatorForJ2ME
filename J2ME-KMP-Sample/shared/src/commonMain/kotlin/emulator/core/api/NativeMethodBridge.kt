@@ -25,6 +25,7 @@ object NativeMethodBridge {
         // Register core implementations
         registerJavaLangSystem()
         registerJavaLangThread()
+        registerJavaLangStringBuffer()
         registerJavaIoPrintStream()
 
         // Register MIDP UI
@@ -114,6 +115,35 @@ object NativeMethodBridge {
         }
     }
 
+    private fun registerJavaLangStringBuffer() {
+        nativeMethods["java/lang/StringBuffer.<init>:()V"] = { frame ->
+            val sbObj = frame.pop() as emulator.core.memory.HeapObject
+            sbObj.instanceFields["value"] = ""
+        }
+
+        nativeMethods["java/lang/StringBuffer.append:(Ljava/lang/String;)Ljava/lang/StringBuffer;"] = { frame ->
+            val str = frame.pop() as? String ?: "null"
+            val sbObj = frame.pop() as emulator.core.memory.HeapObject
+            val current = sbObj.instanceFields["value"] as? String ?: ""
+            sbObj.instanceFields["value"] = current + str
+            frame.push(sbObj) // return this
+        }
+
+        nativeMethods["java/lang/StringBuffer.append:(I)Ljava/lang/StringBuffer;"] = { frame ->
+            val i = frame.popInt()
+            val sbObj = frame.pop() as emulator.core.memory.HeapObject
+            val current = sbObj.instanceFields["value"] as? String ?: ""
+            sbObj.instanceFields["value"] = current + i.toString()
+            frame.push(sbObj)
+        }
+
+        nativeMethods["java/lang/StringBuffer.toString:()Ljava/lang/String;"] = { frame ->
+            val sbObj = frame.pop() as emulator.core.memory.HeapObject
+            val current = sbObj.instanceFields["value"] as? String ?: ""
+            frame.push(current)
+        }
+    }
+
     private fun registerJavaxMicroeditionLcduiDisplay() {
         nativeMethods["javax/microedition/lcdui/Display.getDisplay:(Ljavax/microedition/midlet/MIDlet;)Ljavax/microedition/lcdui/Display;"] = { frame ->
             emulator.core.api.javax.microedition.lcdui.Display.getDisplay(frame)
@@ -142,6 +172,15 @@ object NativeMethodBridge {
         }
         nativeMethods["javax/microedition/lcdui/Graphics.fillRect:(IIII)V"] = { frame ->
             emulator.core.api.javax.microedition.lcdui.Graphics.fillRect(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.drawImage:(Ljavax/microedition/lcdui/Image;III)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.drawImage(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.drawString:(Ljava/lang/String;III)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.drawString(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.setClip:(IIII)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.setClip(frame)
         }
         nativeMethods["javax/microedition/lcdui/Graphics.drawImage:(Ljavax/microedition/lcdui/Image;III)V"] = { frame ->
             emulator.core.api.javax.microedition.lcdui.Graphics.drawImage(frame)

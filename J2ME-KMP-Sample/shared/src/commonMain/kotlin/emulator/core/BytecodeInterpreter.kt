@@ -4,6 +4,9 @@ import emulator.core.classfile.ConstantPool
 import emulator.core.interpreter.ExecutionEngine
 import emulator.core.interpreter.ExecutionFrame
 import emulator.core.memory.HeapObject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * Interface for the Java Bytecode interpreter.
@@ -30,6 +33,52 @@ interface BytecodeInterpreter {
     
     // Manually manage Heap for Java objects
     fun allocateObject(className: String): HeapObject
+
+    companion object {
+        var activeInterpreter: BytecodeInterpreter? = null
+
+        fun injectPointerEvent(type: Int, x: Int, y: Int) {
+            val interpreter = activeInterpreter ?: return
+            
+            // Find the active Canvas from Display
+            val activeCanvas = emulator.core.api.javax.microedition.lcdui.Display.activeDisplayable ?: return
+
+            val methodName = when (type) {
+                0 -> "pointerPressed"
+                1 -> "pointerReleased"
+                2 -> "pointerDragged"
+                else -> return
+            }
+
+            var currentClass = interpreter.getClass(activeCanvas.className)
+            var targetMethod: emulator.core.classfile.MemberInfo? = null
+
+            while (currentClass != null) {
+                targetMethod = currentClass.methods.find {
+                    it.getName(currentClass!!.constantPool) == methodName &&
+                    it.getDescriptor(currentClass!!.constantPool) == "(II)V"
+                }
+                if (targetMethod != null) break
+                val superName = currentClass.resolvedSuperClassName
+                if (superName != null && superName != "java/lang/Object") {
+                    currentClass = interpreter.getClass(superName)
+                } else {
+                    currentClass = null
+                }
+            }
+
+            if (targetMethod != null && currentClass != null) {
+                CoroutineScope(Dispatchers.Default).launch {
+                    interpreter.executeMethod(
+                        activeCanvas.className,
+                        methodName,
+                        "(II)V",
+                        arrayOf(activeCanvas, x, y)
+                    )
+                }
+            }
+        }
+    }
 }
 
 /**

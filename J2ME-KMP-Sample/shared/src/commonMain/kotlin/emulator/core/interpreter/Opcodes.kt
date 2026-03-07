@@ -147,6 +147,10 @@ object Opcodes {
 
     // === Control flow ===
     const val GOTO         = 0xA7  // Branch always (2-byte offset)
+    const val JSR          = 0xA8  // Jump to subroutine
+    const val RET          = 0xA9  // Return from subroutine
+    const val TABLESWITCH  = 0xAA  // Access jump table by index and jump
+    const val LOOKUPSWITCH = 0xAB  // Access jump table by key match and jump
     const val IRETURN      = 0xAC  // Return int from method
     const val LRETURN      = 0xAD  // Return long
     const val FRETURN      = 0xAE  // Return float
@@ -260,7 +264,8 @@ object Opcodes {
             IF_ACMPEQ -> "if_acmpeq"; IF_ACMPNE -> "if_acmpne"
             LCMP -> "lcmp"; FCMPL -> "fcmpl"; FCMPG -> "fcmpg"
             DCMPL -> "dcmpl"; DCMPG -> "dcmpg"
-            GOTO -> "goto"
+            GOTO -> "goto"; JSR -> "jsr"; RET -> "ret"
+            TABLESWITCH -> "tableswitch"; LOOKUPSWITCH -> "lookupswitch"
             IRETURN -> "ireturn"; ARETURN -> "areturn"; RETURN -> "return"
             GETSTATIC -> "getstatic"; PUTSTATIC -> "putstatic"
             GETFIELD -> "getfield"; PUTFIELD -> "putfield"

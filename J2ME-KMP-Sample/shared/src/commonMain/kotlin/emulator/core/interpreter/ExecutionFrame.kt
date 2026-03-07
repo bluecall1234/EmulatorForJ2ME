@@ -103,6 +103,15 @@ class ExecutionFrame(
         return (high shl 8) or low
     }
 
+    /** Read the next unsigned integer (4 bytes, big-endian) and advance PC */
+    fun readU4(): Long {
+        val b1 = bytecode[pc++].toLong() and 0xFF
+        val b2 = bytecode[pc++].toLong() and 0xFF
+        val b3 = bytecode[pc++].toLong() and 0xFF
+        val b4 = bytecode[pc++].toLong() and 0xFF
+        return (b1 shl 24) or (b2 shl 16) or (b3 shl 8) or b4
+    }
+
     override fun toString(): String {
         return "Frame[$className.$methodName PC=$pc stack=$stack locals=${locals.toList()}]"
     }
