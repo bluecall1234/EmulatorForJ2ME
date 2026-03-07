@@ -115,10 +115,14 @@ Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativePr
     auto *dest = (uint32_t *)buffer.bits;
     auto *src = gFramebuffer;
 
+    // Calculate safe bounds to avoid SIGSEGV out-of-bounds reads/writes
+    int copyHeight = (gHeight < buffer.height) ? gHeight : buffer.height;
+    int copyWidth = (gWidth < buffer.width) ? gWidth : buffer.width;
+
     // Copy row by row to handle stride differences
-    for (int y = 0; y < gHeight; y++) {
+    for (int y = 0; y < copyHeight; y++) {
       memcpy(dest + (y * buffer.stride), src + (y * gWidth),
-             gWidth * sizeof(uint32_t));
+             copyWidth * sizeof(uint32_t));
     }
     ANativeWindow_unlockAndPost(gWindow);
   } else {
