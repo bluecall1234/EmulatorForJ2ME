@@ -15,3 +15,4 @@
 ## Phase 5.4: Fixing Game Load Crashes
 - [x] Implement missing `0xAA` (TABLESWITCH) and `0xAB` (LOOKUPSWITCH) opcodes.
 - [x] Implement missing `java.lang.StringBuffer` append/toString methods to prevent NativeBridge unhandled call runtime fallbacks.
+- [x] Implement overloaded `StringBuffer.<init>` constructors (`String` and `I`) to fix NullPointerExceptions during game string memory instantiations.

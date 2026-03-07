@@ -117,13 +117,47 @@ object NativeMethodBridge {
 
     private fun registerJavaLangStringBuffer() {
         nativeMethods["java/lang/StringBuffer.<init>:()V"] = { frame ->
-            val sbObj = frame.pop() as emulator.core.memory.HeapObject
+            val sbObj = frame.pop() as? emulator.core.memory.HeapObject 
+                ?: throw RuntimeException("NullPointerException: StringBuffer <init> called on null or invalid object")
+            sbObj.instanceFields["value"] = ""
+        }
+
+        nativeMethods["java/lang/StringBuffer.<init>:(Ljava/lang/String;)V"] = { frame ->
+            val arg = frame.pop()
+            val str = if (arg is String) {
+                arg
+            } else if (arg is emulator.core.memory.HeapObject) {
+                 arg.instanceFields["value"] as? String ?: ""
+            } else {
+                ""
+            }
+            
+            val sbObj = frame.pop() as? emulator.core.memory.HeapObject 
+                ?: throw RuntimeException("NullPointerException: StringBuffer <init>(String) called on null or invalid object")
+            sbObj.instanceFields["value"] = str
+        }
+        
+        nativeMethods["java/lang/StringBuffer.<init>:(I)V"] = { frame ->
+            val capacity = frame.popInt() // Just consume the capacity argument
+            val sbObj = frame.pop() as? emulator.core.memory.HeapObject 
+                ?: throw RuntimeException("NullPointerException: StringBuffer <init>(I) called on null or invalid object")
             sbObj.instanceFields["value"] = ""
         }
 
         nativeMethods["java/lang/StringBuffer.append:(Ljava/lang/String;)Ljava/lang/StringBuffer;"] = { frame ->
-            val str = frame.pop() as? String ?: "null"
-            val sbObj = frame.pop() as emulator.core.memory.HeapObject
+            val arg = frame.pop()
+            val str = if (arg is String) {
+                arg
+            } else if (arg is emulator.core.memory.HeapObject) {
+                 // A real java.lang.String object. For now we will just use toString unless we emulate String objects fully.
+                 arg.instanceFields["value"] as? String ?: "null"
+            } else {
+                "null"
+            }
+            
+            val sbObj = frame.pop() as? emulator.core.memory.HeapObject 
+                ?: throw RuntimeException("NullPointerException: StringBuffer append(String) called on null or invalid object")
+            
             val current = sbObj.instanceFields["value"] as? String ?: ""
             sbObj.instanceFields["value"] = current + str
             frame.push(sbObj) // return this
@@ -131,14 +165,16 @@ object NativeMethodBridge {
 
         nativeMethods["java/lang/StringBuffer.append:(I)Ljava/lang/StringBuffer;"] = { frame ->
             val i = frame.popInt()
-            val sbObj = frame.pop() as emulator.core.memory.HeapObject
+            val sbObj = frame.pop() as? emulator.core.memory.HeapObject 
+                ?: throw RuntimeException("NullPointerException: StringBuffer append(Int) called on null or invalid object")
             val current = sbObj.instanceFields["value"] as? String ?: ""
             sbObj.instanceFields["value"] = current + i.toString()
             frame.push(sbObj)
         }
 
         nativeMethods["java/lang/StringBuffer.toString:()Ljava/lang/String;"] = { frame ->
-            val sbObj = frame.pop() as emulator.core.memory.HeapObject
+            val sbObj = frame.pop() as? emulator.core.memory.HeapObject 
+                ?: throw RuntimeException("NullPointerException: StringBuffer toString called on null or invalid object")
             val current = sbObj.instanceFields["value"] as? String ?: ""
             frame.push(current)
         }
