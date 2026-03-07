@@ -78,6 +78,65 @@ interface BytecodeInterpreter {
                 }
             }
         }
+
+        /**
+         * Inject a key event (Press/Release) into the active J2ME Canvas.
+         * J2ME expects: public void keyPressed(int keyCode)
+         * 
+         * @param type 0 = Pressed, 1 = Released, 2 = Repeated
+         * @param keyCode Standard J2ME KeyCode (e.g. -1 for UP, 48 for '0')
+         */
+        fun injectKeyEvent(type: Int, keyCode: Int) {
+            val interpreter = activeInterpreter ?: return
+            val activeCanvas = emulator.core.api.javax.microedition.lcdui.Display.activeDisplayable ?: return
+
+            val methodName = when (type) {
+                0 -> "keyPressed"
+                1 -> "keyReleased"
+                2 -> "keyRepeated"
+                else -> return
+            }
+
+            // Standard J2ME method: void keyPressed(int keyCode)
+            val descriptor = "(I)V"
+            
+            var currentClass = interpreter.getClass(activeCanvas.className)
+            var targetMethod: emulator.core.classfile.MemberInfo? = null
+
+            // Walk up the hierarchy to find the implementation (or use the one in Canvas stub if needed)
+            while (currentClass != null) {
+                targetMethod = currentClass.methods.find {
+                    it.getName(currentClass!!.constantPool) == methodName &&
+                    it.getDescriptor(currentClass!!.constantPool) == descriptor
+                }
+                if (targetMethod != null) break
+                
+                val superName = currentClass.resolvedSuperClassName
+                if (superName != null && superName != "java/lang/Object") {
+                    currentClass = interpreter.getClass(superName)
+                } else {
+                    currentClass = null
+                }
+            }
+
+            if (targetMethod != null && currentClass != null) {
+                println("[BytecodeInterpreter] Injecting $methodName($keyCode) into ${activeCanvas.className}")
+                CoroutineScope(Dispatchers.Default).launch {
+                    try {
+                        interpreter.executeMethod(
+                            activeCanvas.className,
+                            methodName,
+                            descriptor,
+                            arrayOf(activeCanvas, keyCode)
+                        )
+                    } catch (e: Exception) {
+                        println("[BytecodeInterpreter] Error during $methodName: ${e.message}")
+                    }
+                }
+            } else {
+                println("[BytecodeInterpreter] Warning: Method $methodName$descriptor not found in ${activeCanvas.className}")
+            }
+        }
     }
 }
 
@@ -113,10 +172,15 @@ class SimpleKMPInterpreter : BytecodeInterpreter {
         
         // Initialize superclass first
         val superCls = clazz.resolvedSuperClassName
-        if (superCls != null && superCls != "java/lang/Object") {
+        if (superCls != null && superCls != "java/lang/Object" && superCls != "none") {
             initializeClass(superCls)
         }
         
+        if (clazz.isNativeShell) {
+            println("[Interpreter] Skipping <clinit> for native shell $className")
+            return
+        }
+
         // Find <clinit>
         val clinit = clazz.methods.find {
             it.getName(clazz.constantPool) == "<clinit>" &&
@@ -129,6 +193,31 @@ class SimpleKMPInterpreter : BytecodeInterpreter {
     }
 
     override fun getClass(className: String): JavaClassFile? {
+        // Skip loading for native classes (handled by NativeMethodBridge)
+        val isNative = className.startsWith("java/") || 
+                       className.startsWith("javax/") ||
+                       className.startsWith("com/nokia/") ||
+                       className.startsWith("com/siemens/") ||
+                       className.startsWith("com/sprintpcs/")
+
+        if (isNative) {
+             if (!loadedClasses.containsKey(className)) {
+                 // Create a dummy class shell so initializeClass doesn't fail
+                 val shell = JavaClassFile(className, byteArrayOf())
+                 
+                 // Define standard J2ME hierarchies for native shells
+                 when (className) {
+                     "javax/microedition/lcdui/Canvas" -> shell.overriddenSuperClassName = "javax/microedition/lcdui/Displayable"
+                     "javax/microedition/lcdui/game/GameCanvas" -> shell.overriddenSuperClassName = "javax/microedition/lcdui/Canvas"
+                     "javax/microedition/lcdui/Displayable" -> shell.overriddenSuperClassName = "java/lang/Object"
+                     "javax/microedition/midlet/MIDlet" -> shell.overriddenSuperClassName = "java/lang/Object"
+                 }
+                 
+                 loadedClasses[className] = shell
+             }
+             return loadedClasses[className]
+        }
+
         // Auto-load class from JAR on demand
         if (!loadedClasses.containsKey(className)) {
             if (currentJarPath.isNotEmpty()) {
@@ -156,23 +245,33 @@ class SimpleKMPInterpreter : BytecodeInterpreter {
     }
 
     override fun executeMethod(className: String, methodName: String, descriptor: String, args: Array<Any?>): Any? {
-        val classFile = getClass(className)
-        if (classFile == null) {
-            println("[Interpreter] ERROR: Class $className could not be loaded")
-            return null
+        var currentClassName: String? = className
+        var methodInfo: emulator.core.classfile.MemberInfo? = null
+        
+        while (currentClassName != null && currentClassName != "java/lang/Object") {
+            val classFile = getClass(currentClassName)
+            if (classFile == null) {
+                println("[Interpreter] ERROR: Class $currentClassName could not be loaded while resolving $className.$methodName")
+                return null
+            }
+            
+            // Find the method by exact name and descriptor
+            methodInfo = classFile.methods.find {
+                it.getName(classFile.constantPool) == methodName &&
+                it.getDescriptor(classFile.constantPool) == descriptor
+            }
+            
+            if (methodInfo != null) {
+                // Found it! Execute using the class it was found in (for correct context, though codeAttr is the same)
+                return executeMethodInternal(currentClassName, methodName, methodInfo, args)
+            }
+            
+            // Move up the inheritance chain
+            currentClassName = classFile.resolvedSuperClassName
         }
         
-        // Find the method by exact name and descriptor
-        val methodInfo = classFile.methods.find {
-            it.getName(classFile.constantPool) == methodName &&
-            it.getDescriptor(classFile.constantPool) == descriptor
-        }
-        if (methodInfo == null) {
-            println("[Interpreter] ERROR: Method $methodName$descriptor not found in $className")
-            return null
-        }
-        
-        return executeMethodInternal(className, methodName, methodInfo, args)
+        println("[Interpreter] ERROR: Method $methodName$descriptor not found in $className or its superclasses")
+        return null
     }
 
     private fun executeMethodInternal(className: String, methodName: String, methodInfo: emulator.core.classfile.MemberInfo, args: Array<Any?>): Any? {

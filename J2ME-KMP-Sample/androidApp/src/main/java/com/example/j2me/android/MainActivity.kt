@@ -62,6 +62,9 @@ class MainActivity : ComponentActivity() {
         
         // Init File Logging (intercepts stdout and stderr)
         emulator.core.setupFileLogging(this)
+        
+        // Init RMS App Context path resolving
+        emulator.core.api.javax.microedition.rms.RmsStorage.appContext = this
 
         setContent {
             var currentScreen by remember { mutableStateOf(AppScreen.LIBRARY) }
@@ -439,9 +442,8 @@ fun EmulatorScreen(game: GameInfo, onBack: () -> Unit) {
                     .background(Color.LightGray)
             ) {
                 VirtualKeypad { keyCode ->
-                    // For now, just log the key press. 
-                    // In Phase 5, we will pass this to the ExecutionEngine or KeyHandler
-                    println("[VirtualKeypad] Key Pressed: $keyCode")
+                    // Phase 8: Connect Virtual Keyboard to ExecutionEngine
+                    emulator.core.BytecodeInterpreter.injectKeyEvent(0, keyCode)
                 }
             }
         }
@@ -572,17 +574,11 @@ private fun startGameLoop(game: GameInfo, width: Int, height: Int, onError: (Str
             interpreter.executeMethod(classFile.className, "<init>", emptyArray())
             interpreter.executeMethod(classFile.className, "startApp", emptyArray())
             
-            // Temporary Render Loop to prove C++ NDK to Screen blitting works
-            var xAnim = 10
-            while(gameStarted) { // Exit loop when back button is pressed
-                // Clear to blue
-                NativeGraphicsBridge.fillRect(0, 0, width, height, 0xFF0000FF.toInt())
-                // Draw a moving green square
-                NativeGraphicsBridge.fillRect(xAnim, 150, 50, 50, 0xFF00FF00.toInt())
-                NativeGraphicsBridge.presentScreen()
-                
-                xAnim = (xAnim + 5) % width
-                delay(30) // ~33 FPS
+            // The J2ME game manages its own render loop via Thread+Runnable+Canvas.repaint()
+            // We just need to keep this coroutine alive until the user exits
+            println("[EmulatorThread] J2ME game loop started. Waiting for exit...")
+            while(gameStarted) {
+                delay(500)
             }
             
             println("[EmulatorThread] Exited game loop.")

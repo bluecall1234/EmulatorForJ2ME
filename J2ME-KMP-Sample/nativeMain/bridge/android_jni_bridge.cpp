@@ -106,20 +106,20 @@ Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativePr
   }
 
   if (gWindow == nullptr) {
-    // Surface is not available right now, just drop the frame
     return;
   }
 
   ANativeWindow_Buffer buffer;
   if (ANativeWindow_lock(gWindow, &buffer, nullptr) == 0) {
+    LOGI("nativePresentScreen: Locked window (%dx%d, stride %d)", buffer.width,
+         buffer.height, buffer.stride);
+
     auto *dest = (uint32_t *)buffer.bits;
     auto *src = gFramebuffer;
 
-    // Calculate safe bounds to avoid SIGSEGV out-of-bounds reads/writes
     int copyHeight = (gHeight < buffer.height) ? gHeight : buffer.height;
     int copyWidth = (gWidth < buffer.width) ? gWidth : buffer.width;
 
-    // Copy row by row to handle stride differences
     for (int y = 0; y < copyHeight; y++) {
       memcpy(dest + (y * buffer.stride), src + (y * gWidth),
              copyWidth * sizeof(uint32_t));

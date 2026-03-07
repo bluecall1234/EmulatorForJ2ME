@@ -29,7 +29,7 @@ class ExecutionEngine(
 ) {
 
     // Enable/disable verbose logging of each opcode execution
-    var debugMode: Boolean = true
+    var debugMode: Boolean = false
 
     /**
      * Execute a method's bytecode in the given frame.
@@ -373,6 +373,8 @@ class ExecutionEngine(
                     val array = when (atype) {
                         4 -> BooleanArray(count) // T_BOOLEAN
                         5 -> CharArray(count)    // T_CHAR
+                        6 -> FloatArray(count)   // T_FLOAT
+                        7 -> DoubleArray(count)  // T_DOUBLE
                         8 -> ByteArray(count)    // T_BYTE
                         9 -> ShortArray(count)   // T_SHORT
                         10 -> IntArray(count)    // T_INT
@@ -527,104 +529,80 @@ class ExecutionEngine(
                     obj.instanceFields["$name:$desc"] = value
                 }
 
-                Opcodes.INVOKEVIRTUAL, Opcodes.INVOKESPECIAL, Opcodes.INVOKESTATIC -> {
+                Opcodes.INVOKEVIRTUAL, Opcodes.INVOKESPECIAL, Opcodes.INVOKESTATIC, Opcodes.INVOKEINTERFACE -> {
                     val index = frame.readU2()
                     val (cls, name, desc) = constantPool.resolveMethodRef(index)
                     val isStatic = (opcode == Opcodes.INVOKESTATIC)
-
-                    if (debugMode) println("  [VM] ${Opcodes.nameOf(opcode)} $cls.$name$desc")
-                    
-                    if (isStatic) {
-                        interpreter.initializeClass(cls)
+                    val isInterface = (opcode == Opcodes.INVOKEINTERFACE)
+                    if (isInterface) {
+                        frame.readU1() // count
+                        frame.readU1() // zero
                     }
 
-                    // FIX #4: Pass isStatic so NativeMethodBridge pops 'this' correctly
-                    val isHandled = emulator.core.api.NativeMethodBridge.callNativeMethod(
-                        className = cls,
-                        methodName = name,
-                        descriptor = desc,
-                        frame = frame,
-                        isStatic = isStatic
-                    )
+                    if (debugMode) {
+                        println("  [VM] ${Opcodes.nameOf(opcode)} $cls.$name$desc")
+                    } else if (!cls.startsWith("java/")) {
+                        // Lightweight trace for all logic including J2ME APIs
+                        println("  [Trace] INVOKE $cls.$name$desc")
+                    }
 
-                    // If not handled by NativeBridge, it means it's a custom game class 
-                    // (or an unimplemented API we must stub if it doesn't exist).
-                    if (!isHandled) {
-                        val methodClass = interpreter.getClass(cls)
-                        
-                        if (methodClass != null && methodClass.findMethod(name) != null) {
-                            // Phase 5.2: Dynamic Bytecode Execution for non-native methods!
-                            val argCount = countMethodArgs(desc)
-                            val totalArgs = if (isStatic) argCount else argCount + 1
+                    // 1. Resolve the method through the hierarchy
+                    var currentCls: String? = cls
+                    var isNativeHandled = false
+                    
+                    // Count args to pop if we need to execute or stub
+                    val argCount = countMethodArgs(desc)
+                    val totalArgs = if (isStatic) argCount else argCount + 1
+
+                    while (currentCls != null && currentCls != "none") {
+                        // Check Native Bridge first for this level of the hierarchy
+                        isNativeHandled = emulator.core.api.NativeMethodBridge.callNativeMethod(
+                            className = currentCls,
+                            methodName = name,
+                            descriptor = desc,
+                            frame = frame,
+                            isStatic = isStatic
+                        )
+                        if (isNativeHandled) break
+
+                        // Check if it's a bytecode class we have loaded
+                        val methodClass = interpreter.getClass(currentCls)
+                        if (methodClass != null && methodClass.findMethod(name, desc) != null) {
+                            // Execute bytecode method
                             val args = Array<Any?>(totalArgs) { null }
-                            
-                            // Pop arguments from stack (in reverse order)
                             for (j in totalArgs - 1 downTo 0) {
                                 args[j] = frame.pop()
                             }
                             
-                            // Let the interpreter recursively execute the bytecode
-                            val result = interpreter.executeMethod(cls, name, desc, args)
+                            if (isStatic) interpreter.initializeClass(currentCls)
+                            val result = interpreter.executeMethod(currentCls, name, desc, args)
+                            if (!desc.endsWith(")V")) frame.push(result)
                             
-                            // Push the return value back (if any)
-                            if (!desc.endsWith(")V")) {
-                                frame.push(result)
-                            }
+                            isNativeHandled = true // Mark as handled so we don't stub
+                            break
+                        }
+
+                        // Move up the hierarchy
+                        currentCls = if (methodClass != null && methodClass.resolvedSuperClassName != "none") {
+                            methodClass.resolvedSuperClassName
+                        } else if (currentCls.startsWith("java/") || currentCls.startsWith("javax/")) {
+                            // For native classes not in bridge, fallback to java/lang/Object if not already there
+                            if (currentCls != "java/lang/Object") "java/lang/Object" else null
                         } else {
-                            // Stub it out (e.g. missing API or interface we haven't ported)
-                            println("  [VM] WARNING: Missing class/method for $cls.$name$desc (stubbing)")
-                            val argCount = countMethodArgs(desc)
-                            for (j in 0 until argCount) {
-                                if (frame.stackSize() > 0) frame.pop()
-                            }
-                            // Pop 'this' only for non-static invocations
-                            if (!isStatic && frame.stackSize() > 0) frame.pop()
-                            if (!desc.endsWith(")V")) {
-                                frame.push(0) // dummy return value
-                            }
+                            null
                         }
                     }
-                }
 
-                Opcodes.INVOKEINTERFACE -> {
-                    val index = frame.readU2()
-                    val _count = frame.readU1() // argument count (redundant)
-                    val _zero = frame.readU1()  // always 0
-                    val (cls, name, desc) = constantPool.resolveMethodRef(index)
-                    if (debugMode) println("  [VM] invokeinterface $cls.$name$desc")
-
-                    // FIX #7: Route through NativeMethodBridge (same as INVOKEVIRTUAL)
-                    val isHandled = emulator.core.api.NativeMethodBridge.callNativeMethod(
-                        className = cls,
-                        methodName = name,
-                        descriptor = desc,
-                        frame = frame,
-                        isStatic = false
-                    )
-
-                    if (!isHandled) {
-                        val methodClass = interpreter.getClass(cls)
-                        
-                        if (methodClass != null && methodClass.findMethod(name) != null) {
-                            val argCount = countMethodArgs(desc)
-                            val totalArgs = argCount + 1 // Interfaces are always instance methods (have 'this')
-                            val args = Array<Any?>(totalArgs) { null }
-                            
-                            for (j in totalArgs - 1 downTo 0) {
-                                args[j] = frame.pop()
-                            }
-                            val result = interpreter.executeMethod(cls, name, desc, args)
-                            if (!desc.endsWith(")V")) {
-                                frame.push(result)
-                            }
-                        } else {
-                            println("  [VM] WARNING: Unhandled invokeinterface $cls.$name$desc (stub)")
-                            val argCount = countMethodArgs(desc)
-                            for (j in 0 until argCount) {
-                                if (frame.stackSize() > 0) frame.pop()
-                            }
-                            if (frame.stackSize() > 0) frame.pop() // pop "this"
-                            if (!desc.endsWith(")V")) frame.push(0)
+                    if (!isNativeHandled) {
+                        // Stub it out
+                        println("  [VM] WARNING: Missing class/method for $cls.$name$desc through hierarchy (stubbing)")
+                        for (j in 0 until argCount) {
+                            if (frame.stackSize() > 0) frame.pop()
+                        }
+                        if (!isStatic && frame.stackSize() > 0) frame.pop() // pop 'this'
+                        if (!desc.endsWith(")V")) {
+                            val retDesc = desc.substring(desc.lastIndexOf(')') + 1)
+                            frame.push(getDefaultValueForType(retDesc))
                         }
                     }
                 }

@@ -41,4 +41,9 @@ actual object NativeGraphicsBridge {
     actual fun drawString(text: String, x: Int, y: Int, color: Int) {
         println("[iOS NativeGraphicsBridge] drawString")
     }
+
+    actual fun decodeImage(data: ByteArray): ImageInfo? {
+        println("[iOS NativeGraphicsBridge] decodeImage: Not implemented")
+        return null
+    }
 }

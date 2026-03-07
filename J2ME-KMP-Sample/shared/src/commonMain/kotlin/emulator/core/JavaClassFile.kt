@@ -5,24 +5,6 @@ import emulator.core.classfile.*
 
 /**
  * Represents a fully parsed Java .class file.
- *
- * A .class file has the following binary structure:
- * ┌─────────────────────────┐
- * │ Magic Number (4 bytes)  │  0xCAFEBABE
- * │ Minor Version (2 bytes) │
- * │ Major Version (2 bytes) │
- * │ Constant Pool Count (2) │
- * │ Constant Pool (variable)│  <-- The "dictionary" of the class
- * │ Access Flags (2 bytes)  │
- * │ This Class (2 bytes)    │  <-- Index into constant pool
- * │ Super Class (2 bytes)   │
- * │ Interfaces (variable)   │
- * │ Fields (variable)       │
- * │ Methods (variable)      │  <-- Contains the actual bytecode
- * │ Attributes (variable)   │
- * └─────────────────────────┘
- *
- * Reference: JVM Spec §4.1
  */
 class JavaClassFile(val className: String, val bytes: ByteArray) {
 
@@ -51,16 +33,37 @@ class JavaClassFile(val className: String, val bytes: ByteArray) {
     // Memory for class-level (static) variables
     val staticFields = mutableMapOf<String, Any?>()
 
+    /** Is this class a native shell (no bytecode, just for type info/inheritance)? */
+    val isNativeShell: Boolean = bytes.isEmpty()
+
     /** Resolved class name from constant pool. Example: "demo/game/MyTestGame" */
     val resolvedClassName: String
-        get() = constantPool.getClassName(thisClassIndex)
+        get() = if (isNativeShell) className else constantPool.getClassName(thisClassIndex)
+
+    /** Optional override for superclass name (used for native shells) */
+    var overriddenSuperClassName: String? = null
 
     /** Resolved superclass name. Example: "java/lang/Object" */
     val resolvedSuperClassName: String
-        get() = if (superClassIndex != 0) constantPool.getClassName(superClassIndex) else "none"
+        get() = when {
+            isNativeShell -> {
+                overriddenSuperClassName ?: when {
+                    className.contains("Canvas") || className.contains("Form") -> "javax/microedition/lcdui/Displayable"
+                    className.contains("MIDlet") -> "java/lang/Object"
+                    else -> "java/lang/Object"
+                }
+            }
+            superClassIndex != 0 -> constantPool.getClassName(superClassIndex)
+            else -> "none"
+        }
 
     init {
-        parse()
+        if (!isNativeShell) {
+            parse()
+        } else {
+            // Minimal setup for native shells
+            constantPool = ConstantPool(emptyList())
+        }
     }
 
     private fun parse() {
@@ -125,16 +128,4 @@ class JavaClassFile(val className: String, val bytes: ByteArray) {
             name == methodName && (descriptor == null || desc == descriptor)
         }
     }
-}
-
-/**
- * Utility for loading .class files from JAR archives.
- * The implementation is platform-specific (Android uses java.util.zip.ZipFile, etc.)
- */
-expect class JarLoader() {
-    /**
-     * @param filePath Absolute path to the JAR file on disk
-     * @param className Fully qualified class name to extract (e.g. "demo.game.MyTestGame")
-     */
-    fun loadClassFromJar(filePath: String, className: String): JavaClassFile
 }

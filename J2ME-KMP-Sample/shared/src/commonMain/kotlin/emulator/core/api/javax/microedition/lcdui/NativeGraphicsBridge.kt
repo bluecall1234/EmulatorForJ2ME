@@ -48,4 +48,11 @@ expect object NativeGraphicsBridge {
      * Draw String (stubbed to native font rendering or ignoring)
      */
     fun drawString(text: String, x: Int, y: Int, color: Int)
+
+    /**
+     * Decodes an image from a byte array (PNG, JPG, etc) into a raw ARGB pixel array.
+     */
+    fun decodeImage(data: ByteArray): ImageInfo?
 }
+
+data class ImageInfo(val pixels: IntArray, val width: Int, val height: Int)

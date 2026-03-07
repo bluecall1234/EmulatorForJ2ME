@@ -7,7 +7,7 @@ import java.util.zip.ZipFile
 /**
  * Android implementation of JarLoader using java.util.zip.ZipFile
  */
-actual class JarLoader {
+actual class JarLoader actual constructor() {
     actual fun loadClassFromJar(filePath: String, className: String): JavaClassFile {
         val file = File(filePath)
         if (!file.exists()) {
@@ -50,5 +50,19 @@ actual class JarLoader {
             }
         }
         return null
+    }
+
+    actual fun loadResource(filePath: String, resourceName: String): ByteArray? {
+        val file = File(filePath)
+        if (!file.exists()) return null
+
+        val zipFile = ZipFile(file)
+        // Normalize name: remove leading slash if present
+        val entryName = if (resourceName.startsWith("/")) resourceName.substring(1) else resourceName
+        val entry = zipFile.getEntry(entryName) ?: return null
+
+        val bytes = zipFile.getInputStream(entry).use { it.readBytes() }
+        zipFile.close()
+        return bytes
     }
 }

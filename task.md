@@ -44,8 +44,32 @@
 - [x] Implement missing `java.lang.StringBuffer` append/toString methods to prevent NativeBridge unhandled call runtime fallbacks.
 - [x] Implement overloaded `StringBuffer.<init>` constructors (`String` and `I`) to fix NullPointerExceptions during game string memory instantiations.
 - [x] Implement `StringBuffer.append` for primitives (`Float`, `Long`, `Char`, `Boolean`) to prevent NativeBridge fallbacks returning `0` references.
+- [x] Fix SIGSEGV memory access fault in `nativePresentScreen` by clamping `memcpy` variables to `ANativeWindow_Buffer` limits.
 
-## Phase 6: Future APIs
-- [ ] Implement Record Management System (RMS) for Game Saves
-- [ ] Connect Virtual Keyboard events to `ExecutionEngine` (Hardware Key mapping)
+## Phase 6: Record Management System (RMS)
+- [x] Create `expect/actual` `RmsStorage` definitions for cross-platform File IO.
+- [x] Implement `RecordStore.kt` state management class.
+- [x] Bridge `RMS` instructions to `NativeMethodBridge.kt`.
+
+## Phase 7: Asset & Image Loading
+- [x] Implement `JarLoader.loadResource` for general archives.
+- [x] Integrate `BitmapFactory` (Android) for internal PNG/JPG decoding.
+- [x] Implement JNI bridge for `Class.getResourceAsStream` and `Image.createImage`.
+- [x] Implement `java.io.InputStream` native stubs.
+
+## Phase 8: Input & Performance (Current)
+- [x] Connect Virtual Keyboard events to `ExecutionEngine` (Hardware Key mapping)
+- [x] Implement JSR-135 Media Stubs for Bounce Tales
+- [x] Fix Bounce Tales startup crashes (NEWARRAY Float support & DataInputStream)
+- [x] Handle Native Class Shells & MIDlet/Displayable initialization
+- [x] Implement Nokia/Siemens API stubs and Image loading fixes (Resolve Black Screen)
+- [x] Implement Hierarchy-Aware Method Resolution (Fix for inherited methods in obfuscated games)
+- [x] Correct Native Shell Hierarchies (Canvas -> Displayable, etc.)
+- [x] Implement drawRegion and Mutable Image Support (Sprite rendering fix)
+- [x] Fix GC Loop & Opcode Logging Optimization (Performance stability)
+- [x] Implement Plan 19: Rendering Fixes & Diagnostics
+    - [x] Implement Canvas.repaint() & serviceRepaints() in NativeMethodBridge
+    - [x] Add Image loading diagnostics in NativeMethodBridge
+    - [x] Add JNI activity logging in Android NativeGraphicsBridge
+    - [x] Implement lightweight Method Call Trace in ExecutionEngine
 - [ ] Implement FastArrayHeapObject for Performance Memory Mode
