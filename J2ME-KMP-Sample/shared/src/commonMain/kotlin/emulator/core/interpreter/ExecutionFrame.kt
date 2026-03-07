@@ -22,7 +22,8 @@ class ExecutionFrame(
     val maxLocals: Int,
     val bytecode: ByteArray,
     val className: String,
-    val methodName: String
+    val methodName: String,
+    val interpreter: emulator.core.BytecodeInterpreter
 ) {
     // Program Counter: index into the bytecode array
     var pc: Int = 0

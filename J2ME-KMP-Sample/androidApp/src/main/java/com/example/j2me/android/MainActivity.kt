@@ -43,7 +43,7 @@ import androidx.compose.material.icons.filled.Delete
 enum class AppScreen { LIBRARY, EMULATOR }
 
 // Game Data Model
-data class GameInfo(val id: String, val name: String, val filePath: String, val mainClass: String?)
+data class GameInfo(val id: String, val name: String, val filePath: String, val mainClass: String?, val touchSupport: Boolean = false)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,8 +69,8 @@ class MainActivity : ComponentActivity() {
                                     currentGame = game
                                     currentScreen = AppScreen.EMULATOR
                                 },
-                                onGameAdded = { uri ->
-                                    val newGame = importGame(uri)
+                                onGameAdded = { uris ->
+                                    val newGame = importGame(uris)
                                     if (newGame != null) {
                                         games = games + newGame
                                     }
@@ -103,27 +103,92 @@ class MainActivity : ComponentActivity() {
         val loader = JarLoader()
         return gamesDir.listFiles()?.filter { it.extension == "jar" }?.map { file ->
             val mainClass = loader.getMainClassFromManifest(file.absolutePath)
+            var gameName = file.nameWithoutExtension
+            var touchSupport = false
+            
+            val jadFile = File(gamesDir, file.nameWithoutExtension + ".jad")
+            if (jadFile.exists()) {
+                val lines = jadFile.readLines()
+                for (line in lines) {
+                    if (line.startsWith("MIDlet-Name:")) {
+                        gameName = line.substringAfter(":").trim()
+                    }
+                    if (line.startsWith("MIDlet-Touch-Support:", ignoreCase = true)) {
+                        touchSupport = line.substringAfter(":").trim().equals("true", ignoreCase = true)
+                    }
+                }
+            }
+
             GameInfo(
                 id = file.nameWithoutExtension,
-                name = file.nameWithoutExtension, // Could extract "MIDlet-Name" from manifest later
+                name = gameName,
                 filePath = file.absolutePath,
-                mainClass = mainClass
+                mainClass = mainClass,
+                touchSupport = touchSupport
             )
         } ?: emptyList()
     }
 
-    private fun importGame(uri: Uri): GameInfo? {
+    private fun importGame(uris: List<Uri>): GameInfo? {
         try {
             val gamesDir = File(filesDir, "games")
             if (!gamesDir.exists()) gamesDir.mkdirs()
 
-            // Generate a unique filename based on timestamp
-            val fileName = "game_${System.currentTimeMillis()}.jar"
-            val destFile = File(gamesDir, fileName)
+            var jarUri: Uri? = null
+            var jadUri: Uri? = null
 
-            contentResolver.openInputStream(uri)?.use { input ->
+            for (uri in uris) {
+                val cursor = contentResolver.query(uri, null, null, null, null)
+                cursor?.use {
+                    if (it.moveToFirst()) {
+                        val displayNameIndex = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (displayNameIndex != -1) {
+                            val name = it.getString(displayNameIndex)
+                            if (name.endsWith(".jad", ignoreCase = true)) {
+                                jadUri = uri
+                            } else if (name.endsWith(".jar", ignoreCase = true)) {
+                                jarUri = uri
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (jarUri == null && uris.size == 1 && jadUri == null) {
+                jarUri = uris[0]
+            }
+
+            val safeJarUri = jarUri ?: return null
+
+            val fileNameBase = "game_${System.currentTimeMillis()}"
+            val destFile = File(gamesDir, "$fileNameBase.jar")
+
+            contentResolver.openInputStream(safeJarUri)?.use { input ->
                 FileOutputStream(destFile).use { output ->
                     input.copyTo(output)
+                }
+            }
+
+            var gameName = "New Game"
+            var touchSupport = false
+
+            val safeJadUri = jadUri
+            if (safeJadUri != null) {
+                val destJad = File(gamesDir, "$fileNameBase.jad")
+                contentResolver.openInputStream(safeJadUri)?.use { input ->
+                    FileOutputStream(destJad).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                
+                val lines = destJad.readLines()
+                for (line in lines) {
+                    if (line.startsWith("MIDlet-Name:")) {
+                        gameName = line.substringAfter(":").trim()
+                    }
+                    if (line.startsWith("MIDlet-Touch-Support:", ignoreCase = true)) {
+                        touchSupport = line.substringAfter(":").trim().equals("true", ignoreCase = true)
+                    }
                 }
             }
             
@@ -132,9 +197,10 @@ class MainActivity : ComponentActivity() {
             
             return GameInfo(
                 id = destFile.nameWithoutExtension,
-                name = "New Game", // We could extract the actual name from the manifest
+                name = gameName,
                 filePath = destFile.absolutePath,
-                mainClass = mainClass
+                mainClass = mainClass,
+                touchSupport = touchSupport
             )
         } catch (e: Exception) {
             e.printStackTrace()
@@ -158,14 +224,14 @@ class MainActivity : ComponentActivity() {
 fun GameLibraryScreen(
     games: List<GameInfo>,
     onGameSelected: (GameInfo) -> Unit,
-    onGameAdded: (Uri) -> Unit,
+    onGameAdded: (List<Uri>) -> Unit,
     onGameDeleted: (GameInfo) -> Unit
 ) {
     val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            onGameAdded(uri)
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            onGameAdded(uris)
         }
     }
 
@@ -174,7 +240,7 @@ fun GameLibraryScreen(
             TopAppBar(title = { Text("J2ME Game Library") })
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { launcher.launch("application/java-archive") }) {
+            FloatingActionButton(onClick = { launcher.launch(arrayOf("*/*")) }) {
                 Icon(Icons.Filled.Add, contentDescription = "Add Game")
             }
         }

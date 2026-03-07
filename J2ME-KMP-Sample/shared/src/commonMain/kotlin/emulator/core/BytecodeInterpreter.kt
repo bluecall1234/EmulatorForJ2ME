@@ -142,7 +142,8 @@ class SimpleKMPInterpreter : BytecodeInterpreter {
             maxLocals = codeAttr.maxLocals,
             bytecode = codeAttr.bytecode,
             className = className,
-            methodName = methodName
+            methodName = methodName,
+            interpreter = this
         )
 
         // Set up local variables with arguments

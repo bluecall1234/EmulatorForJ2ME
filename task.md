@@ -23,9 +23,23 @@
 - [x] Build Virtual Keyboard Overlay (CMP over SDL2 Surface)
 
 ## Phase 5: Optimization & System Interaction (Future)
-- [ ] Implement Dynamic Bytecode Method Execution for non-native invocations (Fix for Custom Classes/Constructors)
+### Phase 5.1: Dynamic Bytecode Method Execution
+- [x] Implement Dynamic Bytecode Method Execution for non-native invocations (Fix for Custom Classes/Constructors)
+- [x] Expand Opcodes support (Shift, Bitwise, Multi-dim Arrays, Local Variable Load variants)
+
+### Phase 5.2: JAD Support & Native Threading
+- [x] Update `GameLibraryScreen` & File Picker to accept `.jad` files.
+- [x] Create `JadParser` to parse key-value attributes from `.jad` files.
+- [x] If a `.jad` is selected, locate the companion `.jar` via `MIDlet-Jar-URL`.
+- [x] Implement `java.lang.Thread.<init>` native bridge.
+- [x] Implement `java.lang.Thread.start()` native bridge (launch background coroutine).
+
+### Phase 5.3: Graphics APIs & Input Mapping
+- [ ] Implement `javax.microedition.lcdui.Graphics` bridging methods.
+- [ ] Route pointer events (Touch) to `Canvas.pointerPressed` via `ExecutionEngine`.
+- [ ] Build "Game Settings" screen to configure Touch Flags / Dimensions.
+
+### Phase 5.X: Future APIs
 - [ ] Implement Record Management System (RMS) for Game Saves
-- [ ] Implement Touch Events Mapping (Translate Compose Pointer input to J2ME `pointerPressed` coords)
-- [ ] Build "Game Settings" Screen (Dynamic Resolution configs, toggle Soft/Touch input)
 - [ ] Connect Virtual Keyboard events to `ExecutionEngine` (Hardware Key mapping)
 - [ ] Implement FastArrayHeapObject for Performance Memory Mode

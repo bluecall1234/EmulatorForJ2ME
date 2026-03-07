@@ -2,6 +2,9 @@ package emulator.core.api
 
 import emulator.core.interpreter.ExecutionFrame
 import emulator.core.memory.HeapObject
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.delay
 
 /**
  * The Native Method Bridge acts as a router between the Bytecode Interpreter
@@ -21,6 +24,7 @@ object NativeMethodBridge {
     init {
         // Register core implementations
         registerJavaLangSystem()
+        registerJavaLangThread()
         registerJavaIoPrintStream()
 
         // Register MIDP UI
@@ -141,6 +145,57 @@ object NativeMethodBridge {
         }
         nativeMethods["javax/microedition/lcdui/Graphics.drawImage:(Ljavax/microedition/lcdui/Image;III)V"] = { frame ->
             emulator.core.api.javax.microedition.lcdui.Graphics.drawImage(frame)
+        }
+    }
+
+    private fun registerJavaLangThread() {
+        // Thread(Runnable r)
+        nativeMethods["java/lang/Thread.<init>:(Ljava/lang/Runnable;)V"] = { frame ->
+            val runnableInfo = frame.pop() // The Runnable object (HeapObject)
+            val threadObj = frame.pop() as emulator.core.memory.HeapObject // The Thread object
+            threadObj.instanceFields["target"] = runnableInfo
+        }
+
+        // Thread(String s)
+        nativeMethods["java/lang/Thread.<init>:(Ljava/lang/String;)V"] = { frame ->
+            val strObj = frame.pop()
+            val threadObj = frame.pop() as emulator.core.memory.HeapObject
+            threadObj.instanceFields["name"] = strObj
+        }
+
+        // Thread()
+        nativeMethods["java/lang/Thread.<init>:()V"] = { frame ->
+            val threadObj = frame.pop() as emulator.core.memory.HeapObject
+        }
+        
+        nativeMethods["java/lang/Thread.start:()V"] = { frame ->
+            val threadObj = frame.pop() as emulator.core.memory.HeapObject
+            
+            // In KMP we can use GlobalScope to spawn a background coroutine
+            // Since ExecutionEngine runs inside the current thread, we'll dispatch it
+            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+                try {
+                    val target = threadObj.instanceFields["target"] as? emulator.core.memory.HeapObject
+                        ?: threadObj // If no target given, Thread runs its own run() method
+                    
+                    val interpreter = frame.interpreter
+                    // Invoke public void run()
+                    interpreter.executeMethod(target.className, "run", "()V", arrayOf(target))
+                } catch (e: Exception) {
+                    println("[Thread] Crash in game loop: ${e.message}")
+                    e.printStackTrace()
+                }
+            }
+        }
+        
+        nativeMethods["java/lang/Thread.sleep:(J)V"] = { frame ->
+            val time = frame.popLong()
+            // This is tricky: we are inside a blocking call in KMP but we shouldn't block main.
+            // However, J2ME Thread.sleep is meant to block the CURRENT Thread. 
+            // In JVM backend we can use Thread.sleep(). In KMP common we can use:
+            kotlinx.coroutines.runBlocking {
+                kotlinx.coroutines.delay(time)
+            }
         }
     }
 
