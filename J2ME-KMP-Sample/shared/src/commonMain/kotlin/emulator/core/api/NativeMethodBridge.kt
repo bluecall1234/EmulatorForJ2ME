@@ -473,9 +473,19 @@ object NativeMethodBridge {
             emulator.core.api.javax.microedition.lcdui.Graphics.drawRegion(frame)
         }
 
-        // javax/microedition/lcdui/Graphics.drawSubstring:(Ljava/lang/String;IIII)V
+        // javax/microedition/lcdui/Graphics.drawSubstring:(Ljava/lang/String;IIIII)V
         nativeMethods["javax/microedition/lcdui/Graphics.drawSubstring:(Ljava/lang/String;IIIII)V"] = { frame ->
             emulator.core.api.javax.microedition.lcdui.Graphics.drawSubstring(frame)
+        }
+
+        // javax/microedition/lcdui/Graphics.drawChar:(CIII)V
+        nativeMethods["javax/microedition/lcdui/Graphics.drawChar:(CIII)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.drawChar(frame)
+        }
+
+        // javax/microedition/lcdui/Graphics.drawChars:([CIIIII)V
+        nativeMethods["javax/microedition/lcdui/Graphics.drawChars:([CIIIII)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.drawChars(frame)
         }
     }
 
@@ -499,18 +509,45 @@ object NativeMethodBridge {
             frame.push(16) // Stub height
         }
         nativeMethods["javax/microedition/lcdui/Font.stringWidth:(Ljava/lang/String;)I"] = { frame ->
-            val str = frame.pop() as? String ?: ""
+            val strObj = frame.pop()
+            val text = when (strObj) {
+                is String -> strObj
+                is HeapObject -> {
+                    val chars = strObj.instanceFields["value:[C"] as? CharArray
+                    chars?.concatToString() ?: ""
+                }
+                else -> ""
+            }
             frame.pop() // this
-            frame.push(str.length * 8)
+            frame.push(emulator.core.api.javax.microedition.lcdui.NativeGraphicsBridge.measureString(text))
         }
         
         // javax/microedition/lcdui/Font.substringWidth:(Ljava/lang/String;II)I
         nativeMethods["javax/microedition/lcdui/Font.substringWidth:(Ljava/lang/String;II)I"] = { frame ->
             val len = frame.popInt()
             val offset = frame.popInt()
-            val str = (frame.pop() as? String) ?: ""
+            val strObj = frame.pop()
+            val fullText = when (strObj) {
+                is String -> strObj
+                is HeapObject -> {
+                    val chars = strObj.instanceFields["value:[C"] as? CharArray
+                    chars?.concatToString() ?: ""
+                }
+                else -> ""
+            }
+            val text = try { fullText.substring(offset, offset + len) } catch(e: Exception) { "" }
             frame.pop() // this
-            frame.push(len * 8) // Stub
+            frame.push(emulator.core.api.javax.microedition.lcdui.NativeGraphicsBridge.measureString(text))
+        }
+
+        // javax/microedition/lcdui/Font.charsWidth:([CII)I
+        nativeMethods["javax/microedition/lcdui/Font.charsWidth:([CII)I"] = { frame ->
+            val len = frame.popInt()
+            val offset = frame.popInt()
+            val chars = frame.pop() as? CharArray ?: CharArray(0)
+            val text = try { chars.concatToString(offset, offset + len) } catch(e: Exception) { "" }
+            frame.pop() // this
+            frame.push(emulator.core.api.javax.microedition.lcdui.NativeGraphicsBridge.measureString(text))
         }
     }
 

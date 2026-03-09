@@ -190,9 +190,21 @@ Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDr
     return;
   }
 
-  // Adjust X/Y based on anchor (stubbed to Top-Left for now)
+  // Adjust X/Y based on anchor
   int startX = x;
   int startY = y;
+
+  if (anchor & 1) { // HCENTER
+    startX -= imgW / 2;
+  } else if (anchor & 8) { // RIGHT
+    startX -= imgW;
+  }
+
+  if (anchor & 32) { // BOTTOM
+    startY -= imgH;
+  } else if (anchor & 2) { // VCENTER
+    startY -= imgH / 2;
+  }
 
   for (int py = 0; py < imgH; py++) {
     for (int px = 0; px < imgW; px++) {
@@ -204,7 +216,7 @@ Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDr
         uint32_t color = pixels[py * imgW + px];
         // Simple alpha blending: if alpha is > 0
         uint8_t a = (color >> 24) & 0xFF;
-        if (a > 128) {
+        if (a > 0) {
           gFramebuffer[screenY * gWidth + screenX] = color;
         }
       }
@@ -212,7 +224,8 @@ Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDr
   }
 
   env->ReleaseIntArrayElements(imageRgb, pixels, JNI_ABORT);
-  LOGD("nativeDrawImage rendered %dx%d into (%d,%d)", imgW, imgH, x, y);
+  LOGD("nativeDrawImage rendered %dx%d into (%d,%d) anchor=%d", imgW, imgH, x,
+       y, anchor);
 }
 
 // ============================================================

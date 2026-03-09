@@ -7,6 +7,14 @@ import emulator.core.memory.HeapObject
  * Implementation of J2ME's javax.microedition.lcdui.Graphics
  */
 object Graphics {
+    // Anchor constants
+    const val HCENTER = 1
+    const val VCENTER = 2
+    const val LEFT = 4
+    const val RIGHT = 8
+    const val TOP = 16
+    const val BOTTOM = 32
+    const val BASELINE = 64
 
     /**
      * javax.microedition.lcdui.Graphics.setColor(I)V
@@ -115,16 +123,27 @@ object Graphics {
         } else {
             NativeGraphicsBridge.drawImage(srcPixels, w, h, x + translateX, y + translateY, anchor)
         }
-        println("[J2ME Graphics] drawImage(w=$w, h=$h, x=${x + translateX}, y=${y + translateY})")
+        println("[J2ME Graphics] drawImage(w=$w, h=$h, x=${x + translateX}, y=${y + translateY}, anchor=$anchor)")
     }
 
     private fun drawImageToBuffer(src: IntArray, sw: Int, sh: Int, dest: IntArray, dw: Int, dh: Int, x: Int, y: Int, anchor: Int) {
-        // Simple top-left anchor for now
+        var drawX = x
+        var drawY = y
+
+        // Horizontal
+        if ((anchor and HCENTER) != 0) drawX -= sw / 2
+        else if ((anchor and RIGHT) != 0) drawX -= sw
+        
+        // Vertical
+        if ((anchor and BOTTOM) != 0) drawY -= sh
+        else if ((anchor and VCENTER) != 0) drawY -= sh / 2
+        // TOP is default (16)
+
         for (iy in 0 until sh) {
-            val dy = y + iy
+            val dy = drawY + iy
             if (dy < 0 || dy >= dh) continue
             for (ix in 0 until sw) {
-                val dx = x + ix
+                val dx = drawX + ix
                 if (dx < 0 || dx >= dw) continue
                 val pixel = src[iy * sw + ix]
                 if (((pixel shr 24) and 0xFF) > 0) { // Alpha check
@@ -134,29 +153,49 @@ object Graphics {
         }
     }
 
+    private fun getStringValue(obj: Any?): String {
+        return when (obj) {
+            is String -> obj
+            is HeapObject -> {
+                val chars = obj.instanceFields["value:[C"] as? CharArray
+                chars?.concatToString() ?: ""
+            }
+            else -> ""
+        }
+    }
+
     /**
-     * javax.microedition.lcdui.Graphics.drawString(Ljava/lang/String;III)V
+     * javax.microedition.lcdui.Graphics.drawString:(Ljava/lang/String;III)V
      */
     fun drawString(frame: ExecutionFrame) {
         val anchor = frame.popInt()
         val y = frame.popInt()
         val x = frame.popInt()
-        val strObj = frame.pop() as? HeapObject
+        val strObj = frame.pop()
         val thisGraphics = frame.pop() as? HeapObject
         val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0
         
         val translateX = thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0
         val translateY = thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0
 
-        val chars = strObj?.instanceFields?.get("value:[C") as? CharArray
-        val text = chars?.concatToString() ?: ""
+        val text = getStringValue(strObj)
+        println("[Graphics] drawString: text=\"$text\" x=$x y=$y anchor=$anchor color=0x${color.toString(16)}")
 
-        // String drawing to buffer not implemented yet
-        NativeGraphicsBridge.drawString(text, x + translateX, y + translateY, color)
+        val targetImage = thisGraphics?.instanceFields?.get("_targetImage") as? HeapObject
+        if (targetImage != null) {
+            val pixels = targetImage.instanceFields["rgb:[I"] as? IntArray
+            val imgW = targetImage.instanceFields["width:I"] as? Int ?: 0
+            val imgH = targetImage.instanceFields["height:I"] as? Int ?: 0
+            if (pixels != null) {
+                NativeGraphicsBridge.drawTextToBuffer(pixels, imgW, imgH, text, x + translateX, y + translateY, anchor, color)
+            }
+        } else {
+            NativeGraphicsBridge.drawString(text, x + translateX, y + translateY, anchor, color)
+        }
     }
 
     /**
-     * javax.microedition.lcdui.Graphics.drawSubstring(Ljava/lang/String;IIIII)V
+     * javax.microedition.lcdui.Graphics.drawSubstring:(Ljava/lang/String;IIIII)V
      */
     fun drawSubstring(frame: ExecutionFrame) {
         val anchor = frame.popInt()
@@ -164,23 +203,94 @@ object Graphics {
         val x = frame.popInt()
         val len = frame.popInt()
         val offset = frame.popInt()
-        val strObj = frame.pop() as? HeapObject
+        val strObj = frame.pop()
         val thisGraphics = frame.pop() as? HeapObject
         val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0
         
         val translateX = thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0
         val translateY = thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0
 
-        val chars = strObj?.instanceFields?.get("value:[C") as? CharArray
-        val fullText = chars?.concatToString() ?: ""
+        val fullText = getStringValue(strObj)
         val text = try {
             fullText.substring(offset, offset + len)
         } catch (e: Exception) {
             println("  [Graphics] drawSubstring error: offset=$offset, len=$len, fullTextLength=${fullText.length}")
             ""
         }
+        println("[Graphics] drawSubstring: text=\"$text\" x=$x y=$y anchor=$anchor color=0x${color.toString(16)}")
 
-        NativeGraphicsBridge.drawString(text, x + translateX, y + translateY, color)
+        val targetImage = thisGraphics?.instanceFields?.get("_targetImage") as? HeapObject
+        if (targetImage != null) {
+            val pixels = targetImage.instanceFields["rgb:[I"] as? IntArray
+            val imgW = targetImage.instanceFields["width:I"] as? Int ?: 0
+            val imgH = targetImage.instanceFields["height:I"] as? Int ?: 0
+            if (pixels != null) {
+                NativeGraphicsBridge.drawTextToBuffer(pixels, imgW, imgH, text, x + translateX, y + translateY, anchor, color)
+            }
+        } else {
+            NativeGraphicsBridge.drawString(text, x + translateX, y + translateY, anchor, color)
+        }
+    }
+
+    /**
+     * javax.microedition.lcdui.Graphics.drawChar:(CIII)V
+     */
+    fun drawChar(frame: ExecutionFrame) {
+        val anchor = frame.popInt()
+        val y = frame.popInt()
+        val x = frame.popInt()
+        val char = frame.popInt().toChar()
+        val thisGraphics = frame.pop() as? HeapObject
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0
+        val translateX = thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0
+        val translateY = thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0
+
+        val text = char.toString()
+        val targetImage = thisGraphics?.instanceFields?.get("_targetImage") as? HeapObject
+        if (targetImage != null) {
+            val pixels = targetImage.instanceFields["rgb:[I"] as? IntArray
+            val imgW = targetImage.instanceFields["width:I"] as? Int ?: 0
+            val imgH = targetImage.instanceFields["height:I"] as? Int ?: 0
+            if (pixels != null) {
+                NativeGraphicsBridge.drawTextToBuffer(pixels, imgW, imgH, text, x + translateX, y + translateY, anchor, color)
+            }
+        } else {
+            NativeGraphicsBridge.drawString(text, x + translateX, y + translateY, anchor, color)
+        }
+    }
+
+    /**
+     * javax.microedition.lcdui.Graphics.drawChars:([CIIIII)V
+     */
+    fun drawChars(frame: ExecutionFrame) {
+        val anchor = frame.popInt()
+        val y = frame.popInt()
+        val x = frame.popInt()
+        val len = frame.popInt()
+        val offset = frame.popInt()
+        val chars = frame.pop() as? CharArray ?: CharArray(0)
+        val thisGraphics = frame.pop() as? HeapObject
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0
+        val translateX = thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0
+        val translateY = thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0
+
+        val text = try {
+            chars.concatToString(offset, offset + len)
+        } catch (e: Exception) {
+            ""
+        }
+        
+        val targetImage = thisGraphics?.instanceFields?.get("_targetImage") as? HeapObject
+        if (targetImage != null) {
+            val pixels = targetImage.instanceFields["rgb:[I"] as? IntArray
+            val imgW = targetImage.instanceFields["width:I"] as? Int ?: 0
+            val imgH = targetImage.instanceFields["height:I"] as? Int ?: 0
+            if (pixels != null) {
+                NativeGraphicsBridge.drawTextToBuffer(pixels, imgW, imgH, text, x + translateX, y + translateY, anchor, color)
+            }
+        } else {
+            NativeGraphicsBridge.drawString(text, x + translateX, y + translateY, anchor, color)
+        }
     }
 
     /**
@@ -287,18 +397,29 @@ object Graphics {
             }
             NativeGraphicsBridge.drawImage(subPixels, width, height, destX, destY, anchor)
         }
-        println("[J2ME Graphics] drawRegion(srcX=$srcX, srcY=$srcY, w=$width, h=$height, destX=$destX, destY=$destY)")
+        println("[J2ME Graphics] drawRegion(srcX=$srcX, srcY=$srcY, w=$width, h=$height, destX=$destX, destY=$destY, anchor=$anchor)")
     }
 
     private fun drawRegionToBuffer(src: IntArray, sw: Int, sh: Int, sx: Int, sy: Int, w: Int, h: Int, 
                                    dest: IntArray, dw: Int, dh: Int, dx: Int, dy: Int, anchor: Int) {
-        // Simple top-left anchor
+        var drawX = dx
+        var drawY = dy
+
+        // Horizontal
+        if ((anchor and HCENTER) != 0) drawX -= w / 2
+        else if ((anchor and RIGHT) != 0) drawX -= w
+        
+        // Vertical
+        if ((anchor and BOTTOM) != 0) drawY -= h
+        else if ((anchor and VCENTER) != 0) drawY -= h / 2
+        // TOP is default
+
         for (iy in 0 until h) {
-            val dyy = dy + iy
+            val dyy = drawY + iy
             val syy = sy + iy
             if (dyy < 0 || dyy >= dh || syy < 0 || syy >= sh) continue
             for (ix in 0 until w) {
-                val dxx = dx + ix
+                val dxx = drawX + ix
                 val sxx = sx + ix
                 if (dxx < 0 || dxx >= dw || sxx < 0 || sxx >= sw) continue
                 val pixel = src[syy * sw + sxx]

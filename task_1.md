@@ -24,6 +24,8 @@
     - [x] Implement missing J2ME APIs (DataOutputStream, readLong, drawSubstring, etc.)
     - [x] Implement InputStream.read([BII)I to resolve lookup failures
     - [x] Fix stuck game after SplashScreen (Implement InputStream.read([B)I and BAOS.write([BII)V)
+    - [x] Support off-screen text drawing (fix missing menu text)
+    - [x] Implement J2ME anchor handling in drawImage and drawRegion
     - [/] Trigger bytecode paint() from repaint() to update game screen
     - [ ] Investigate JNI layer rendering and remove log gating
     - [ ] Add more diagnostics to Image.createImage if sprites still missing

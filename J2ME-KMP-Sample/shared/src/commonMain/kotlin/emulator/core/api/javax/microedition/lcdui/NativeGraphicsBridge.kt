@@ -44,10 +44,14 @@ expect object NativeGraphicsBridge {
      */
     fun drawImage(imageRgb: IntArray, imgW: Int, imgH: Int, x: Int, y: Int, anchor: Int)
 
+    fun drawString(text: String, x: Int, y: Int, anchor: Int, color: Int)
+
+    fun measureString(text: String): Int
+
     /**
-     * Draw String (stubbed to native font rendering or ignoring)
+     * Draw text into a raw ARGB pixel buffer.
      */
-    fun drawString(text: String, x: Int, y: Int, color: Int)
+    fun drawTextToBuffer(pixels: IntArray, width: Int, height: Int, text: String, x: Int, y: Int, anchor: Int, color: Int)
 
     /**
      * Decodes an image from a byte array (PNG, JPG, etc) into a raw ARGB pixel array.
