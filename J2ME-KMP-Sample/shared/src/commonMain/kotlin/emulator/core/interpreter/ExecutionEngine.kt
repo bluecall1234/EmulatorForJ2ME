@@ -1,7 +1,9 @@
 package emulator.core.interpreter
-
 import emulator.core.classfile.ConstantPool
 import emulator.core.classfile.ConstantPoolEntry
+import emulator.core.memory.HeapObject
+
+class JavaExceptionWrapper(val exception: Any?) : RuntimeException("Java Exception")
 
 /**
  * The Execution Engine - the core "brain" of the J2ME emulator.
@@ -41,6 +43,7 @@ class ExecutionEngine(
         val bytecode = frame.bytecode
 
         while (frame.pc < bytecode.size) {
+            try {
             val opcodePC = frame.pc  // Save PC for logging
             val opcode = frame.readU1()
 
@@ -389,8 +392,11 @@ class ExecutionEngine(
                         is IntArray -> arr.size
                         is ByteArray -> arr.size
                         is CharArray -> arr.size
+                        is ShortArray -> arr.size
                         is BooleanArray -> arr.size
                         is LongArray -> arr.size
+                        is FloatArray -> arr.size
+                        is DoubleArray -> arr.size
                         is Array<*> -> arr.size
                         else -> throw RuntimeException("arraylength on non-array: ${arr?.let { it::class.simpleName }}")
                     }
@@ -546,15 +552,28 @@ class ExecutionEngine(
                         println("  [Trace] INVOKE $cls.$name$desc")
                     }
 
-                    // 1. Resolve the method through the hierarchy
-                    var currentCls: String? = cls
-                    var isNativeHandled = false
-                    
-                    // Count args to pop if we need to execute or stub
                     val argCount = countMethodArgs(desc)
                     val totalArgs = if (isStatic) argCount else argCount + 1
 
+                    val isCommonApi = cls.startsWith("java/lang/") || cls.startsWith("java/io/")
+                    
+                    if (debugMode || (!isCommonApi)) { 
+                        val obj = if (isStatic) null else frame.peekAt(argCount) as? HeapObject
+                        println("  [VM] INVOKE opcode=0x${opcode.toString(16)} cls=$cls name=$name desc=$desc static=$isStatic obj_cls=${obj?.className}")
+                    }
+
+                    var currentCls: String? = if (isStatic || opcode == Opcodes.INVOKESPECIAL) {
+                        cls
+                    } else {
+                        val obj = frame.peekAt(argCount) as? HeapObject
+                        obj?.className ?: cls
+                    }
+                    
+                    var isNativeHandled = false
                     while (currentCls != null && currentCls != "none") {
+                        if (debugMode || (!isCommonApi)) {
+                            println("    [Hierarchy] Checking $currentCls for $name$desc")
+                        }
                         // Check Native Bridge first for this level of the hierarchy
                         isNativeHandled = emulator.core.api.NativeMethodBridge.callNativeMethod(
                             className = currentCls,
@@ -583,13 +602,19 @@ class ExecutionEngine(
                         }
 
                         // Move up the hierarchy
-                        currentCls = if (methodClass != null && methodClass.resolvedSuperClassName != "none") {
+                        val nextCls = if (methodClass != null && methodClass.resolvedSuperClassName != "none") {
                             methodClass.resolvedSuperClassName
-                        } else if (currentCls.startsWith("java/") || currentCls.startsWith("javax/")) {
+                        } else if (currentCls!!.startsWith("java/") || currentCls.startsWith("javax/")) {
                             // For native classes not in bridge, fallback to java/lang/Object if not already there
                             if (currentCls != "java/lang/Object") "java/lang/Object" else null
                         } else {
                             null
+                        }
+                        
+                        if (nextCls == currentCls) {
+                            currentCls = null
+                        } else {
+                            currentCls = nextCls
                         }
                     }
 
@@ -675,7 +700,16 @@ class ExecutionEngine(
 
                 Opcodes.ATHROW -> {
                     val exception = frame.pop()
-                    throw RuntimeException("J2ME Exception thrown: $exception")
+                    if (exception == null) throw RuntimeException("NullPointerException in ATHROW")
+                    
+                    val handlerPc = findExceptionHandler(frame, exception)
+                    if (handlerPc != -1) {
+                        frame.pc = handlerPc
+                        frame.push(exception) // Catch block expects exception on stack
+                        if (debugMode) println("  [VM] Exception caught! Jumping to PC=$handlerPc")
+                    } else {
+                        throw JavaExceptionWrapper(exception)
+                    }
                 }
 
                 Opcodes.ANEWARRAY -> {
@@ -753,6 +787,27 @@ class ExecutionEngine(
                         "(${Opcodes.nameOf(opcode)}) at PC=$opcodePC " +
                         "in ${frame.className}.${frame.methodName}"
                     )
+                }
+            }
+            } catch (e: JavaExceptionWrapper) {
+                // Propagate to caller
+                throw e
+            } catch (e: Throwable) {
+                val javaEx = if (e.message?.contains("java/io/EOFException") == true) {
+                    println("[VM] Converting native EOFException to Java EOFException")
+                    interpreter.allocateObject("java/io/EOFException")
+                } else {
+                    println("[VM] Native exception during execution: ${e.message}")
+                    e.printStackTrace()
+                    throw e
+                }
+                
+                val handlerPc = findExceptionHandler(frame, javaEx)
+                if (handlerPc != -1) {
+                    frame.pc = handlerPc
+                    frame.push(javaEx)
+                } else {
+                    throw JavaExceptionWrapper(javaEx)
                 }
             }
         }
@@ -839,5 +894,40 @@ class ExecutionEngine(
             'D' -> 0.0
             else -> null // 'L' (Object) or '[' (Array)
         }
+    }
+
+    private fun findExceptionHandler(frame: ExecutionFrame, exception: Any?): Int {
+        val pc = frame.pc - 1 // The opcode that threw is at pc-1 (wait, pc already advanced)
+        // Actually, some opcodes advance PC before throwing. 
+        // For simplicity, we check the PC at the start of the opcode: opcodePC.
+        // Wait, I don't have opcodePC in the catch block. 
+        // Let's use frame.pc. Most J2ME compilers include the throwing instruction in the range.
+
+        for (entry in frame.exceptionTable) {
+            if (frame.pc > entry.startPc && frame.pc <= entry.endPc) {
+                if (entry.catchType == 0) return entry.handlerPc // finally
+                
+                val catchClassName = constantPool.getClassName(entry.catchType)
+                if (isInstanceOf(exception, catchClassName)) {
+                    return entry.handlerPc
+                }
+            }
+        }
+        return -1
+    }
+
+    private fun isInstanceOf(obj: Any?, className: String): Boolean {
+        if (obj == null) return false
+        val objClassName = (obj as? HeapObject)?.className ?: obj::class.simpleName ?: ""
+        if (objClassName == className) return true
+        
+        // Simple hierarchy check
+        var current: String? = objClassName
+        while (current != null && current != "java/lang/Object" && current != "none") {
+            if (current == className) return true
+            val clazz = interpreter.getClass(current)
+            current = clazz?.resolvedSuperClassName
+        }
+        return false
     }
 }

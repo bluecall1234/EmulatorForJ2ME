@@ -245,50 +245,85 @@ class SimpleKMPInterpreter : BytecodeInterpreter {
     }
 
     override fun executeMethod(className: String, methodName: String, descriptor: String, args: Array<Any?>): Any? {
-        var currentClassName: String? = className
-        var methodInfo: emulator.core.classfile.MemberInfo? = null
-        
-        while (currentClassName != null && currentClassName != "java/lang/Object") {
-            val classFile = getClass(currentClassName)
-            if (classFile == null) {
-                println("[Interpreter] ERROR: Class $currentClassName could not be loaded while resolving $className.$methodName")
-                return null
+        try {
+            var currentClassName: String? = className
+            while (currentClassName != null && currentClassName != "java/lang/Object" && currentClassName != "none") {
+                val classFile = getClass(currentClassName)
+                if (classFile == null) {
+                    println("[Interpreter] ERROR: Class $currentClassName could not be loaded while resolving $className.$methodName")
+                    break
+                }
+                
+                // Find method in this class or its interfaces
+                val methodInfo = classFile.methods.find {
+                    it.getName(classFile.constantPool) == methodName &&
+                    it.getDescriptor(classFile.constantPool) == descriptor
+                }
+                
+                if (methodInfo != null) {
+                    return executeMethodInternal(currentClassName, methodName, methodInfo, args)
+                }
+
+                // Search in interfaces of THIS class
+                val ifaceFound = findMethodInInterfaces(classFile, methodName, descriptor)
+                if (ifaceFound != null) {
+                    return executeMethodInternal(ifaceFound.first.className, methodName, ifaceFound.second, args)
+                }
+                
+                if (methodName.length <= 2) {
+                    println("[Interpreter] Lookup failed in $currentClassName for $methodName$descriptor. Available:")
+                    classFile.methods.forEach {
+                        println("  - ${it.getName(classFile.constantPool)}${it.getDescriptor(classFile.constantPool)}")
+                    }
+                }
+
+                // Move up
+                currentClassName = classFile.resolvedSuperClassName
             }
             
-            // Find the method by exact name and descriptor
-            methodInfo = classFile.methods.find {
-                it.getName(classFile.constantPool) == methodName &&
-                it.getDescriptor(classFile.constantPool) == descriptor
-            }
-            
-            if (methodInfo != null) {
-                // Found it! Execute using the class it was found in (for correct context, though codeAttr is the same)
-                return executeMethodInternal(currentClassName, methodName, methodInfo, args)
-            }
-            
-            // Move up the inheritance chain
-            currentClassName = classFile.resolvedSuperClassName
+            println("[Interpreter] ERROR: Method $methodName$descriptor not found in $className or parents/interfaces")
+            return null
+        } catch (e: Throwable) {
+            println("[Interpreter] CRASH in executeMethod($className.$methodName): ${e.message}")
+            e.printStackTrace()
+            throw e
         }
-        
-        println("[Interpreter] ERROR: Method $methodName$descriptor not found in $className or its superclasses")
+    }
+
+    private fun findMethodInInterfaces(classFile: emulator.core.JavaClassFile, methodName: String, descriptor: String): Pair<emulator.core.JavaClassFile, emulator.core.classfile.MemberInfo>? {
+        for (ifaceName in classFile.interfaces) {
+            val ifaceFile = getClass(ifaceName)
+            if (ifaceFile != null) {
+                val methodInfo = ifaceFile.methods.find {
+                    it.getName(ifaceFile.constantPool) == methodName &&
+                    it.getDescriptor(ifaceFile.constantPool) == descriptor
+                }
+                if (methodInfo != null) return ifaceFile to methodInfo
+                
+                // Recursive search in super-interfaces
+                val found = findMethodInInterfaces(ifaceFile, methodName, descriptor)
+                if (found != null) return found
+            }
+        }
         return null
     }
 
     private fun executeMethodInternal(className: String, methodName: String, methodInfo: emulator.core.classfile.MemberInfo, args: Array<Any?>): Any? {
-        println("[Interpreter] === Executing $className.$methodName ===")
-
         // Get the Code attribute (contains the bytecode)
         val codeAttr = methodInfo.getCodeAttribute()
         if (codeAttr == null) {
-            println("[Interpreter] Method $methodName is abstract/native - no bytecode")
+            println("[Interpreter] Method $className.$methodName is abstract/native - no bytecode")
             return null
         }
+
+        println("[Interpreter] === Executing $className.$methodName (maxStack=${codeAttr.maxStack}, maxLocals=${codeAttr.maxLocals}, args=${args.size}) ===")
 
         // Create an execution frame
         val frame = ExecutionFrame(
             maxStack = codeAttr.maxStack,
             maxLocals = codeAttr.maxLocals,
             bytecode = codeAttr.bytecode,
+            exceptionTable = codeAttr.exceptionTable,
             className = className,
             methodName = methodName,
             interpreter = this
@@ -308,10 +343,14 @@ class SimpleKMPInterpreter : BytecodeInterpreter {
         // Execute the bytecode
         val classFile = getClass(className)!!
         val engine = ExecutionEngine(classFile.constantPool, this)
-        val result = engine.execute(frame)
-
-        println("[Interpreter] === $className.$methodName finished, result=$result ===")
-        return result
+        try {
+            val result = engine.execute(frame)
+            println("[Interpreter] === $className.$methodName finished, result=$result ===")
+            return result
+        } catch (e: emulator.core.interpreter.JavaExceptionWrapper) {
+            println("[Interpreter] === $className.$methodName TERMINATED by uncaught Java Exception: ${e.exception} ===")
+            throw e
+        }
     }
 
     override fun allocateObject(className: String): HeapObject {

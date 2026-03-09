@@ -51,19 +51,17 @@ actual object NativeGraphicsBridge {
 
     actual fun presentScreen() {
         frameCount++
-        if (frameCount % 60 == 0) {
-            println("[JNI] presentScreen() called (frame #$frameCount)")
-        }
+        println("[JNI] presentScreen() called (frame #$frameCount)")
         NativeGraphicsBridgeJni.nativePresentScreen()
     }
 
     actual fun fillRect(x: Int, y: Int, w: Int, h: Int, color: Int) {
         val a = (color shr 24) and 0xFF
-        val alpha = if (a == 0 && (color and 0xFFFFFF) != 0) 255 else a
+        val alpha = a
         val r = (color shr 16) and 0xFF
         val g = (color shr 8) and 0xFF
         val b = color and 0xFF
-        if (frameCount % 60 == 0) {
+        if (color != -1) {
             println("[JNI] fillRect(x=$x, y=$y, w=$w, h=$h) color=0x${color.toString(16)} (ARGB: $alpha, $r, $g, $b)")
         }
         NativeGraphicsBridgeJni.nativeFillRect(x, y, w, h, r, g, b, alpha)
@@ -74,9 +72,7 @@ actual object NativeGraphicsBridge {
     }
 
     actual fun drawImage(imageRgb: IntArray, imgW: Int, imgH: Int, x: Int, y: Int, anchor: Int) {
-        if (frameCount % 60 == 0) {
-            println("[JNI] drawImage() called for ${imgW}x${imgH} at ($x, $y)")
-        }
+        println("[JNI] drawImage() called for ${imgW}x${imgH} at ($x, $y)")
         NativeGraphicsBridgeJni.nativeDrawImage(imageRgb, imgW, imgH, x, y, anchor)
     }
 
@@ -85,8 +81,12 @@ actual object NativeGraphicsBridge {
     }
 
     actual fun decodeImage(data: ByteArray): ImageInfo? {
+        return decodeImage(data, 0, data.size)
+    }
+
+    actual fun decodeImage(data: ByteArray, offset: Int, length: Int): ImageInfo? {
         try {
-            val bitmap = android.graphics.BitmapFactory.decodeByteArray(data, 0, data.size) ?: return null
+            val bitmap = android.graphics.BitmapFactory.decodeByteArray(data, offset, length) ?: return null
             val w = bitmap.width
             val h = bitmap.height
             val pixels = IntArray(w * h)

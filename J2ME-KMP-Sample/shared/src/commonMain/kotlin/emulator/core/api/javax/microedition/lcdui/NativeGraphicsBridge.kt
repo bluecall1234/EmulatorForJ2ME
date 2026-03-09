@@ -53,6 +53,11 @@ expect object NativeGraphicsBridge {
      * Decodes an image from a byte array (PNG, JPG, etc) into a raw ARGB pixel array.
      */
     fun decodeImage(data: ByteArray): ImageInfo?
+
+    /**
+     * Decodes an image from a sub-range of a byte array.
+     */
+    fun decodeImage(data: ByteArray, offset: Int, length: Int): ImageInfo?
 }
 
 data class ImageInfo(val pixels: IntArray, val width: Int, val height: Int)

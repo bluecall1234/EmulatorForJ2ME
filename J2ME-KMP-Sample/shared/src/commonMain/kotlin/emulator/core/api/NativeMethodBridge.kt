@@ -2,9 +2,13 @@ package emulator.core.api
 
 import emulator.core.interpreter.ExecutionFrame
 import emulator.core.memory.HeapObject
+import emulator.core.BytecodeInterpreter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import emulator.core.api.javax.microedition.lcdui.NativeGraphicsBridge
 
 /**
  * The Native Method Bridge acts as a router between the Bytecode Interpreter
@@ -31,7 +35,6 @@ object NativeMethodBridge {
         registerJavaLangStringBuffer()
         registerJavaIoPrintStream()
         registerJavaLangMath()
-        registerJavaLangRandom()
         registerJavaLangString()
         registerJavaIoDataInputStream()
         registerJavaLangInteger()
@@ -52,6 +55,11 @@ object NativeMethodBridge {
         registerComNokiaMidUi()
         registerJavaxMicroeditionLcduiGameCanvas()
         registerJavaUtil()
+        registerJavaLangRuntime()
+        registerJavaIoByteArrayOutputStream()
+        registerJavaIoDataOutputStream()
+        registerComNokiaMidSound()
+        println("[NativeBridge] Total registered methods: ${nativeMethods.size}")
     }
 
     /**
@@ -120,6 +128,11 @@ object NativeMethodBridge {
             emulator.core.api.java.lang.System.currentTimeMillis(frame)
         }
         
+        // public static void gc()
+        nativeMethods["java/lang/System.gc:()V"] = { _ ->
+            // Stub GC
+        }
+
         // public static String getProperty(String key)
         nativeMethods["java/lang/System.getProperty:(Ljava/lang/String;)Ljava/lang/String;"] = { frame ->
             val key = frame.pop() as? String ?: ""
@@ -129,7 +142,7 @@ object NativeMethodBridge {
                 "microedition.configuration" -> "CLDC-1.1"
                 "microedition.profiles" -> "MIDP-2.0"
                 "microedition.encoding" -> "UTF-8"
-                "microedition.locale" -> "en-US"
+                "microedition.locale" -> "en"
                 "microedition.m3g.version" -> "1.1"
                 "microedition.media.version" -> "1.0"
                 "microedition.smartcardslots" -> "0"
@@ -138,6 +151,25 @@ object NativeMethodBridge {
                 else -> null
             }
             frame.push(value)
+        }
+
+        nativeMethods["java/lang/System.arraycopy:(Ljava/lang/Object;ILjava/lang/Object;II)V"] = { frame ->
+            val length = frame.popInt()
+            val destPos = frame.popInt()
+            val dest = frame.pop()
+            val srcPos = frame.popInt()
+            val src = frame.pop()
+            
+            if (src is ByteArray && dest is ByteArray) {
+                src.copyInto(dest, destPos, srcPos, srcPos + length)
+            } else if (src is IntArray && dest is IntArray) {
+                src.copyInto(dest, destPos, srcPos, srcPos + length)
+            } else if (src is Array<*> && dest is Array<*>) {
+                @Suppress("UNCHECKED_CAST")
+                (src as Array<Any?>).copyInto(dest as Array<Any?>, destPos, srcPos, srcPos + length)
+            } else {
+                println("[NativeBridge] System.arraycopy: unhandled array type conversion for $src to $dest")
+            }
         }
     }
 
@@ -373,43 +405,6 @@ object NativeMethodBridge {
         }
     }
 
-    private fun registerJavaLangRandom() {
-        val random = kotlin.random.Random
-
-        // Random.<init>(J) - seed ignored, use Kotlin Random
-        nativeMethods["java/util/Random.<init>:(J)V"] = { frame ->
-            frame.popLong() // seed - pop and ignore
-            val obj = frame.pop() as? HeapObject
-            // Store internal state marker
-            obj?.instanceFields?.set("_rng", true)
-        }
-
-        // Random.<init>() - no-arg
-        nativeMethods["java/util/Random.<init>:()V"] = { frame ->
-            val obj = frame.pop() as? HeapObject
-            obj?.instanceFields?.set("_rng", true)
-        }
-
-        // Random.nextInt(int bound)
-        nativeMethods["java/util/Random.nextInt:(I)I"] = { frame ->
-            val bound = frame.popInt()
-            frame.pop() // pop 'this'
-            frame.push(if (bound > 0) random.nextInt(bound) else 0)
-        }
-
-        // Random.nextInt()
-        nativeMethods["java/util/Random.nextInt:()I"] = { frame ->
-            frame.pop() // pop 'this'
-            frame.push(random.nextInt())
-        }
-
-        // Random.nextLong()
-        nativeMethods["java/util/Random.nextLong:()J"] = { frame ->
-            frame.pop() // pop 'this'
-            frame.push(random.nextLong())
-        }
-    }
-
     private fun registerJavaxMicroeditionLcduiCanvas() {
         nativeMethods["javax/microedition/lcdui/Canvas.repaint:()V"] = { frame ->
             println("[NativeBridge] Calling Canvas.repaint()")
@@ -477,6 +472,11 @@ object NativeMethodBridge {
         nativeMethods["javax/microedition/lcdui/Graphics.drawRegion:(Ljavax/microedition/lcdui/Image;IIIIIIII)V"] = { frame ->
             emulator.core.api.javax.microedition.lcdui.Graphics.drawRegion(frame)
         }
+
+        // javax/microedition/lcdui/Graphics.drawSubstring:(Ljava/lang/String;IIII)V
+        nativeMethods["javax/microedition/lcdui/Graphics.drawSubstring:(Ljava/lang/String;IIIII)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.drawSubstring(frame)
+        }
     }
 
     private fun registerJavaxMicroeditionLcduiFont() {
@@ -502,6 +502,15 @@ object NativeMethodBridge {
             val str = frame.pop() as? String ?: ""
             frame.pop() // this
             frame.push(str.length * 8)
+        }
+        
+        // javax/microedition/lcdui/Font.substringWidth:(Ljava/lang/String;II)I
+        nativeMethods["javax/microedition/lcdui/Font.substringWidth:(Ljava/lang/String;II)I"] = { frame ->
+            val len = frame.popInt()
+            val offset = frame.popInt()
+            val str = (frame.pop() as? String) ?: ""
+            frame.pop() // this
+            frame.push(len * 8) // Stub
         }
     }
 
@@ -625,6 +634,40 @@ object NativeMethodBridge {
         }
     }
 
+    private fun registerJavaIoByteArrayOutputStream() {
+        // java/io/ByteArrayOutputStream.<init>:()V
+        nativeMethods["java/io/ByteArrayOutputStream.<init>:()V"] = { frame ->
+            val obj = frame.pop() as? HeapObject
+            obj?.instanceFields?.set("_buffer", mutableListOf<Byte>())
+        }
+        // java/io/ByteArrayOutputStream.<init>:(I)V
+        nativeMethods["java/io/ByteArrayOutputStream.<init>:(I)V"] = { frame ->
+            frame.popInt() // initial capacity
+            val obj = frame.pop() as? HeapObject
+            obj?.instanceFields?.set("_buffer", mutableListOf<Byte>())
+        }
+        // java/io/ByteArrayOutputStream.write:(I)V
+        nativeMethods["java/io/ByteArrayOutputStream.write:(I)V"] = { frame ->
+            val b = frame.popInt().toByte()
+            val obj = frame.pop() as? HeapObject
+            val buffer = obj?.instanceFields?.get("_buffer") as? MutableList<Byte>
+            buffer?.add(b)
+        }
+        // java/io/ByteArrayOutputStream.toByteArray:()[B
+        nativeMethods["java/io/ByteArrayOutputStream.toByteArray:()[B"] = { frame ->
+            val obj = frame.pop() as? HeapObject
+            val buffer = obj?.instanceFields?.get("_buffer") as? List<Byte>
+            val array = buffer?.toByteArray() ?: ByteArray(0)
+            frame.push(array)
+        }
+        // java/io/ByteArrayOutputStream.size:()I
+        nativeMethods["java/io/ByteArrayOutputStream.size:()I"] = { frame ->
+            val obj = frame.pop() as? HeapObject
+            val buffer = obj?.instanceFields?.get("_buffer") as? List<Byte>
+            frame.push(buffer?.size ?: 0)
+        }
+    }
+
     private fun registerJavaxMicroeditionLcduiImage() {
         // javax/microedition/lcdui/Image.createImage:(Ljava/lang/String;)Ljavax/microedition/lcdui/Image;
         nativeMethods["javax/microedition/lcdui/Image.createImage:(Ljava/lang/String;)Ljavax/microedition/lcdui/Image;"] = { frame ->
@@ -643,9 +686,11 @@ object NativeMethodBridge {
                         frame.push(imgObj)
                         println("[NativeBridge] Image.createImage(\"$name\") SUCCESS (${info.width}x${info.height})")
                     } else {
+                        println("[NativeBridge] Image.createImage(\"$name\") FAILED: Decode error")
                         throw RuntimeException("Failed to decode image: $name")
                     }
                 } else {
+                    println("[NativeBridge] Image.createImage(\"$name\") FAILED: Resource not found")
                     throw RuntimeException("Resource not found: $name")
                 }
             } else {
@@ -761,8 +806,8 @@ object NativeMethodBridge {
                         ?: threadObj // If no target given, Thread runs its own run() method
                     
                     val interpreter = frame.interpreter
-                    // Invoke public void run()
-                    interpreter.executeMethod(target.className, "run", "()V", arrayOf(target))
+                    println("[Thread] Invoking ${target.className}.run() with target=$target")
+                    interpreter.executeMethod(target.className, "run", "()V", arrayOf<Any?>(target))
                 } catch (e: Exception) {
                     println("[Thread] Crash in game loop: ${e.message}")
                     e.printStackTrace()
@@ -873,6 +918,11 @@ object NativeMethodBridge {
         nativeMethods["javax/microedition/rms/RecordStore.deleteRecordStore:(Ljava/lang/String;)V"] = { frame ->
             val storeName = frame.pop() as? String ?: ""
             emulator.core.api.javax.microedition.rms.RecordStore.deleteRecordStore(storeName)
+        }
+        
+        // public static String[] listRecordStores()
+        nativeMethods["javax/microedition/rms/RecordStore.listRecordStores:()[Ljava/lang/String;"] = { frame ->
+            frame.push(emptyArray<String>())
         }
     }
 
@@ -1026,10 +1076,10 @@ object NativeMethodBridge {
                     inputStream.instanceFields["_pos:I"] = pos + 2
                     frame.push((b1 shl 8) or b2)
                 } else {
-                    frame.push(0)
+                    throw RuntimeException("java/io/EOFException")
                 }
             } else {
-                frame.push(0)
+                throw RuntimeException("java/io/EOFException")
             }
         }
 
@@ -1046,7 +1096,7 @@ object NativeMethodBridge {
                     inputStream.instanceFields["_pos:I"] = pos + 2
                     frame.push(((b1 shl 8) or b2).toShort().toInt())
                 } else {
-                    frame.push(0)
+                    throw RuntimeException("java/io/EOFException")
                 }
             } else {
                 frame.push(0)
@@ -1061,14 +1111,14 @@ object NativeMethodBridge {
                 val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
                 var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
                 if (pos + 3 < data.size) {
-                    val v = ((data[pos].toInt() and 0xFF) shl 24) or
-                            ((data[pos+1].toInt() and 0xFF) shl 16) or
-                            ((data[pos+2].toInt() and 0xFF) shl 8) or
-                            (data[pos+3].toInt() and 0xFF)
+                    val b1 = data[pos].toInt() and 0xFF
+                    val b2 = data[pos + 1].toInt() and 0xFF
+                    val b3 = data[pos + 2].toInt() and 0xFF
+                    val b4 = data[pos + 3].toInt() and 0xFF
                     inputStream.instanceFields["_pos:I"] = pos + 4
-                    frame.push(v)
+                    frame.push((b1 shl 24) or (b2 shl 16) or (b3 shl 8) or b4)
                 } else {
-                    frame.push(0)
+                    throw RuntimeException("java/io/EOFException")
                 }
             } else {
                 frame.push(0)
@@ -1087,7 +1137,8 @@ object NativeMethodBridge {
                     inputStream.instanceFields["_pos:I"] = pos + 1
                     frame.push(b)
                 } else {
-                    frame.push(0)
+                    // J2ME: throw EOFException
+                    throw RuntimeException("java/io/EOFException")
                 }
             } else {
                 frame.push(0)
@@ -1106,10 +1157,10 @@ object NativeMethodBridge {
                     inputStream.instanceFields["_pos:I"] = pos + 1
                     frame.push(b)
                 } else {
-                    frame.push(0)
+                    throw RuntimeException("java/io/EOFException")
                 }
             } else {
-                frame.push(0)
+                throw RuntimeException("java/io/EOFException")
             }
         }
 
@@ -1173,6 +1224,75 @@ object NativeMethodBridge {
             frame.popInt()
             frame.pop()
         }
+
+        // java/io/DataInputStream.readLong:()J
+        nativeMethods["java/io/DataInputStream.readLong:()J"] = { frame ->
+            val thisObj = frame.pop() as? HeapObject
+            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject
+            if (inputStream != null) {
+                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
+                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
+                if (pos + 7 < data.size) {
+                    val b1 = data[pos].toLong() and 0xFF
+                    val b2 = data[pos + 1].toLong() and 0xFF
+                    val b3 = data[pos + 2].toLong() and 0xFF
+                    val b4 = data[pos + 3].toLong() and 0xFF
+                    val b5 = data[pos + 4].toLong() and 0xFF
+                    val b6 = data[pos + 5].toLong() and 0xFF
+                    val b7 = data[pos + 6].toLong() and 0xFF
+                    val b8 = data[pos + 7].toLong() and 0xFF
+                    inputStream.instanceFields["_pos:I"] = pos + 8
+                    val res = (b1 shl 56) or (b2 shl 48) or (b3 shl 40) or (b4 shl 32) or
+                              (b5 shl 24) or (b6 shl 16) or (b7 shl 8) or b8
+                    frame.push(res)
+                } else {
+                    throw RuntimeException("java/io/EOFException")
+                }
+            } else {
+                frame.push(0L)
+            }
+        }
+    }
+
+    private fun registerJavaIoDataOutputStream() {
+        // java/io/DataOutputStream.<init>:(Ljava/io/OutputStream;)V
+        nativeMethods["java/io/DataOutputStream.<init>:(Ljava/io/OutputStream;)V"] = { frame ->
+            val outputStream = frame.pop() as? HeapObject
+            val thisObj = frame.pop() as? HeapObject
+            thisObj?.instanceFields?.set("_stream", outputStream)
+        }
+        // java/io/DataOutputStream.writeByte:(I)V
+        nativeMethods["java/io/DataOutputStream.writeByte:(I)V"] = { frame ->
+            val b = frame.popInt().toByte()
+            val thisObj = frame.pop() as? HeapObject
+            val out = thisObj?.instanceFields?.get("_stream") as? HeapObject
+            val buffer = out?.instanceFields?.get("_buffer") as? MutableList<Byte>
+            buffer?.add(b)
+        }
+        // java/io/DataOutputStream.writeShort:(I)V
+        nativeMethods["java/io/DataOutputStream.writeShort:(I)V"] = { frame ->
+            val v = frame.popInt()
+            val thisObj = frame.pop() as? HeapObject
+            val out = thisObj?.instanceFields?.get("_stream") as? HeapObject
+            val buffer = out?.instanceFields?.get("_buffer") as? MutableList<Byte>
+            buffer?.add((v shr 8).toByte())
+            buffer?.add(v.toByte())
+        }
+        // java/io/DataOutputStream.writeInt:(I)V
+        nativeMethods["java/io/DataOutputStream.writeInt:(I)V"] = { frame ->
+            val v = frame.popInt()
+            val thisObj = frame.pop() as? HeapObject
+            val out = thisObj?.instanceFields?.get("_stream") as? HeapObject
+            val buffer = out?.instanceFields?.get("_buffer") as? MutableList<Byte>
+            buffer?.add((v shr 24).toByte())
+            buffer?.add((v shr 16).toByte())
+            buffer?.add((v shr 8).toByte())
+            buffer?.add(v.toByte())
+        }
+        // java/io/DataOutputStream.close:()V
+        nativeMethods["java/io/DataOutputStream.close:()V"] = { frame ->
+            frame.pop()
+        }
     }
 
     private fun registerJavaxMicroeditionMedia() {
@@ -1184,6 +1304,14 @@ object NativeMethodBridge {
             // Return a stub Player object
             val playerObj = HeapObject("javax/microedition/media/Player")
             println("[NativeBridge] Manager.createPlayer(type=$type) -> Stubbed")
+            frame.push(playerObj)
+        }
+
+        // javax/microedition/media/Manager.createPlayer:(Ljava/lang/String;)Ljavax/microedition/media/Player;
+        nativeMethods["javax/microedition/media/Manager.createPlayer:(Ljava/lang/String;)Ljavax/microedition/media/Player;"] = { frame ->
+            val locator = frame.pop() as? String
+            val playerObj = HeapObject("javax/microedition/media/Player")
+            println("[NativeBridge] Manager.createPlayer(locator=$locator) -> Stubbed")
             frame.push(playerObj)
         }
 
@@ -1223,6 +1351,17 @@ object NativeMethodBridge {
             frame.pop() // controlName
             frame.pop() // this
             frame.push(null) // Controls not supported (VolumeControl etc)
+        }
+
+        // javax/microedition/media/Player.getState:()I
+        nativeMethods["javax/microedition/media/Player.getState:()I"] = { frame ->
+            frame.pop() // this
+            frame.push(300) // PREFETCHED (Stub)
+        }
+
+        // javax/microedition/media/Player.deallocate:()V
+        nativeMethods["javax/microedition/media/Player.deallocate:()V"] = { frame ->
+            frame.pop() // this
         }
     }
 
@@ -1275,30 +1414,54 @@ object NativeMethodBridge {
         // javax/microedition/lcdui/Canvas.getGraphics:()Ljavax/microedition/lcdui/Graphics;
         nativeMethods["javax/microedition/lcdui/Canvas.getGraphics:()Ljavax/microedition/lcdui/Graphics;"] = { frame ->
              frame.pop() // this
-             frame.push(HeapObject("javax/microedition/lcdui/Graphics"))
+             val gObj = HeapObject("javax/microedition/lcdui/Graphics")
+             gObj.instanceFields["color:I"] = 0xFF000000.toInt() // Default opaque black
+             frame.push(gObj)
         }
 
         // javax/microedition/lcdui/game/GameCanvas.<init>:(Z)V
         nativeMethods["javax/microedition/lcdui/game/GameCanvas.<init>:(Z)V"] = { frame ->
             val suppress = frame.popInt()
-            val thisObj = frame.pop()
+            val thisObj = frame.pop() as? HeapObject
+            println("[NativeBridge] GameCanvas.<init>(suppress=$suppress)")
+            
+            // Create backbuffer image
+            val backBuffer = HeapObject("javax/microedition/lcdui/Image")
+            backBuffer.instanceFields["width:I"] = 240
+            backBuffer.instanceFields["height:I"] = 320
+            backBuffer.instanceFields["rgb:[I"] = IntArray(240 * 320) { 0xFFFFFFFF.toInt() } // White background by default
+            
+            thisObj?.instanceFields?.set("_backBuffer", backBuffer)
         }
     }
 
     private fun registerJavaxMicroeditionLcduiGameCanvas() {
         // javax/microedition/lcdui/game/GameCanvas.flushGraphics:()V
         nativeMethods["javax/microedition/lcdui/game/GameCanvas.flushGraphics:()V"] = { frame ->
-            frame.pop() // this
+            val thisObj = frame.pop() as? HeapObject
+            println("[NativeBridge] GameCanvas.flushGraphics() called")
+            val backBuffer = thisObj?.instanceFields?.get("_backBuffer") as? HeapObject
+            val pixels = backBuffer?.instanceFields?.get("rgb:[I") as? IntArray
+            if (pixels != null) {
+                emulator.core.api.javax.microedition.lcdui.NativeGraphicsBridge.drawImage(pixels, 240, 320, 0, 0, 0)
+            }
             emulator.core.api.javax.microedition.lcdui.NativeGraphicsBridge.presentScreen()
         }
 
         // javax/microedition/lcdui/game/GameCanvas.flushGraphics:(IIII)V
         nativeMethods["javax/microedition/lcdui/game/GameCanvas.flushGraphics:(IIII)V"] = { frame ->
-            frame.popInt() // h
-            frame.popInt() // w
-            frame.popInt() // y
-            frame.popInt() // x
-            frame.pop() // this
+            val h = frame.popInt()
+            val w = frame.popInt()
+            val y = frame.popInt()
+            val x = frame.popInt()
+            val thisObj = frame.pop() as? HeapObject
+            
+            val backBuffer = thisObj?.instanceFields?.get("_backBuffer") as? HeapObject
+            val pixels = backBuffer?.instanceFields?.get("rgb:[I") as? IntArray
+            if (pixels != null) {
+                // For simplified implementation, we just present the whole screen
+                emulator.core.api.javax.microedition.lcdui.NativeGraphicsBridge.drawImage(pixels, 240, 320, 0, 0, 0)
+            }
             emulator.core.api.javax.microedition.lcdui.NativeGraphicsBridge.presentScreen()
         }
         
@@ -1310,8 +1473,11 @@ object NativeMethodBridge {
         
         // javax/microedition/lcdui/game/GameCanvas.getGraphics:()Ljavax/microedition/lcdui/Graphics;
         nativeMethods["javax/microedition/lcdui/game/GameCanvas.getGraphics:()Ljavax/microedition/lcdui/Graphics;"] = { frame ->
-            frame.pop() // this
+            val thisObj = frame.pop() as? HeapObject
+            println("[NativeBridge] GameCanvas.getGraphics() called")
             val gObj = HeapObject("javax/microedition/lcdui/Graphics")
+            gObj.instanceFields["_targetImage"] = thisObj?.instanceFields?.get("_backBuffer")
+            gObj.instanceFields["color:I"] = 0xFF000000.toInt() // Default opaque black
             frame.push(gObj)
         }
 
@@ -1332,6 +1498,7 @@ object NativeMethodBridge {
         // com/nokia/mid/ui/DirectUtils.getDirectGraphics:(Ljavax/microedition/lcdui/Graphics;)Lcom/nokia/mid/ui/DirectGraphics;
         nativeMethods["com/nokia/mid/ui/DirectUtils.getDirectGraphics:(Ljavax/microedition/lcdui/Graphics;)Lcom/nokia/mid/ui/DirectGraphics;"] = { frame ->
             val graphics = frame.pop() as? HeapObject
+            println("[NativeBridge] DirectUtils.getDirectGraphics($graphics) called")
             // DirectGraphics is often an interface that Graphics implements in Nokia phones.
             // We just return the Graphics object itself as a DirectGraphics shell.
             frame.push(graphics)
@@ -1340,13 +1507,95 @@ object NativeMethodBridge {
         // Stub DirectGraphics methods to prevent crash
         nativeMethods["com/nokia/mid/ui/DirectGraphics.setARGBColor:(I)V"] = { frame ->
             val argb = frame.popInt()
-            val thisObj = frame.pop()
+            val thisObj = frame.pop() as? HeapObject
+            println("[NativeBridge] DirectGraphics.setARGBColor($argb) on $thisObj")
+            thisObj?.instanceFields?.put("color:I", argb)
+        }
+
+        // com/nokia/mid/ui/DirectUtils.createImage:(II)Ljavax/microedition/lcdui/Image;
+        nativeMethods["com/nokia/mid/ui/DirectUtils.createImage:(II)Ljavax/microedition/lcdui/Image;"] = { frame ->
+            val h = frame.popInt()
+            val w = frame.popInt()
+            println("[NativeBridge] DirectUtils.createImage(w=$w, h=$h) SUCCESS")
+            val imgObj = HeapObject("javax/microedition/lcdui/Image")
+            imgObj.instanceFields["width:I"] = w
+            imgObj.instanceFields["height:I"] = h
+            imgObj.instanceFields["rgb:[I"] = IntArray(w * h)
+            frame.push(imgObj)
+        }
+
+        // com/nokia/mid/ui/DirectUtils.createImage:(III)Ljavax/microedition/lcdui/Image;
+        nativeMethods["com/nokia/mid/ui/DirectUtils.createImage:(III)Ljavax/microedition/lcdui/Image;"] = { frame ->
+            val argb = frame.popInt()
+            val h = frame.popInt()
+            val w = frame.popInt()
+            println("[NativeBridge] DirectUtils.createImage(w=$w, h=$h, argb=$argb) SUCCESS")
+            val imgObj = HeapObject("javax/microedition/lcdui/Image")
+            imgObj.instanceFields["width:I"] = w
+            imgObj.instanceFields["height:I"] = h
+            val pixels = IntArray(w * h) { argb }
+            imgObj.instanceFields["rgb:[I"] = pixels
+            frame.push(imgObj)
         }
         
+        // com/nokia/mid/ui/DirectUtils.createImage:([BII)Ljavax/microedition/lcdui/Image;
+        nativeMethods["com/nokia/mid/ui/DirectUtils.createImage:([BII)Ljavax/microedition/lcdui/Image;"] = { frame ->
+            val len = frame.popInt()
+            val off = frame.popInt()
+            val data = frame.pop() as? ByteArray ?: ByteArray(0)
+            println("[NativeBridge] DirectUtils.createImage(byteArray, off=$off, len=$len) called")
+            
+            val decoded = NativeGraphicsBridge.decodeImage(data, off, len)
+            if (decoded != null) {
+                val imgObj = HeapObject("javax/microedition/lcdui/Image")
+                imgObj.instanceFields["width:I"] = decoded.width
+                imgObj.instanceFields["height:I"] = decoded.height
+                imgObj.instanceFields["rgb:[I"] = decoded.pixels
+                frame.push(imgObj)
+                println("[NativeBridge] DirectUtils.createImage from byte array SUCCESS (${decoded.width}x${decoded.height})")
+            } else {
+                frame.push(null)
+                println("[NativeBridge] DirectUtils.createImage from byte array FAILED")
+            }
+        }
+
         nativeMethods["com/nokia/mid/ui/DirectGraphics.drawPixels:([SZI[IIIIIII)V"] = { frame ->
-            // High-complexity Nokia pixel drawing (ignore for stub)
             popArguments("([SZI[IIIIIII)V", frame)
             frame.pop() // this
+        }
+
+        // com/nokia/mid/ui/DeviceControl.setLights:(II)V
+        nativeMethods["com/nokia/mid/ui/DeviceControl.setLights:(II)V"] = { frame ->
+            frame.popInt() // level
+            frame.popInt() // num
+        }
+    }
+    
+    private fun registerComNokiaMidSound() {
+        // com/nokia/mid/sound/Sound.<init>:(I)V
+        nativeMethods["com/nokia/mid/sound/Sound.<init>:(I)V"] = { frame ->
+            frame.popInt() // type
+            frame.pop() // this
+        }
+        // com/nokia/mid/sound/Sound.<init>:([BI)V
+        nativeMethods["com/nokia/mid/sound/Sound.<init>:([BI)V"] = { frame ->
+            frame.popInt() // type
+            frame.pop() // data
+            frame.pop() // this
+        }
+        // com/nokia/mid/sound/Sound.play:(I)V
+        nativeMethods["com/nokia/mid/sound/Sound.play:(I)V"] = { frame ->
+            frame.popInt() // loop
+            frame.pop() // this
+        }
+        // com/nokia/mid/sound/Sound.stop:()V
+        nativeMethods["com/nokia/mid/sound/Sound.stop:()V"] = { frame ->
+            frame.pop() // this
+        }
+        // com/nokia/mid/sound/Sound.getState:()I
+        nativeMethods["com/nokia/mid/sound/Sound.getState:()I"] = { frame ->
+            frame.pop() // this
+            frame.push(0) // SOUND_STOPPED
         }
     }
     private fun registerJavaUtil() {
@@ -1391,6 +1640,83 @@ object NativeMethodBridge {
             val list = obj?.instanceFields?.get("_data") as? MutableList<Any?>
             list?.clear()
         }
+        
+        // java/util/Vector.contains:(Ljava/lang/Object;)Z
+        nativeMethods["java/util/Vector.contains:(Ljava/lang/Object;)Z"] = { frame ->
+            val element = frame.pop()
+            val obj = frame.pop() as? HeapObject
+            val list = obj?.instanceFields?.get("_data") as? List<Any?>
+            frame.push(if (list?.contains(element) == true) 1 else 0)
+        }
+        // java/util/Vector.indexOf:(Ljava/lang/Object;)I
+        nativeMethods["java/util/Vector.indexOf:(Ljava/lang/Object;)I"] = { frame ->
+            val element = frame.pop()
+            val obj = frame.pop() as? HeapObject
+            val list = obj?.instanceFields?.get("_data") as? List<Any?>
+            frame.push(list?.indexOf(element) ?: -1)
+        }
+        // java/util/Vector.insertElementAt:(Ljava/lang/Object;I)V
+        nativeMethods["java/util/Vector.insertElementAt:(Ljava/lang/Object;I)V"] = { frame ->
+            val index = frame.popInt()
+            val element = frame.pop()
+            val obj = frame.pop() as? HeapObject
+            val list = obj?.instanceFields?.get("_data") as? MutableList<Any?>
+            if (list != null && index >= 0 && index <= list.size) {
+                list.add(index, element)
+            }
+        }
+        // java/util/Vector.setElementAt:(Ljava/lang/Object;I)V
+        nativeMethods["java/util/Vector.setElementAt:(Ljava/lang/Object;I)V"] = { frame ->
+            val index = frame.popInt()
+            val element = frame.pop()
+            val obj = frame.pop() as? HeapObject
+            val list = obj?.instanceFields?.get("_data") as? MutableList<Any?>
+            if (list != null && index >= 0 && index < list.size) {
+                list[index] = element
+            }
+        }
+        // java/util/Vector.removeElement:(Ljava/lang/Object;)Z
+        nativeMethods["java/util/Vector.removeElement:(Ljava/lang/Object;)Z"] = { frame ->
+            val element = frame.pop()
+            val obj = frame.pop() as? HeapObject
+            val list = obj?.instanceFields?.get("_data") as? MutableList<Any?>
+            frame.push(if (list?.remove(element) == true) 1 else 0)
+        }
+        // java/util/Vector.isEmpty:()Z
+        nativeMethods["java/util/Vector.isEmpty:()Z"] = { frame ->
+            val obj = frame.pop() as? HeapObject
+            val list = obj?.instanceFields?.get("_data") as? List<Any?>
+            frame.push(if (list?.isEmpty() == true) 1 else 0)
+        }
+        // java/util/Vector.removeElementAt:(I)V
+        nativeMethods["java/util/Vector.removeElementAt:(I)V"] = { frame ->
+            val index = frame.popInt()
+            val obj = frame.pop() as? HeapObject
+            val list = obj?.instanceFields?.get("_data") as? MutableList<Any?>
+            if (list != null && index >= 0 && index < list.size) {
+                list.removeAt(index)
+            }
+        }
+        // java/util/Vector.firstElement:()Ljava/lang/Object;
+        nativeMethods["java/util/Vector.firstElement:()Ljava/lang/Object;"] = { frame ->
+            val obj = frame.pop() as? HeapObject
+            val list = obj?.instanceFields?.get("_data") as? List<Any?>
+            frame.push(if (list != null && list.isNotEmpty()) list[0] else null)
+        }
+        // java/util/Vector.lastElement:()Ljava/lang/Object;
+        nativeMethods["java/util/Vector.lastElement:()Ljava/lang/Object;"] = { frame ->
+            val obj = frame.pop() as? HeapObject
+            val list = obj?.instanceFields?.get("_data") as? List<Any?>
+            frame.push(if (list != null && list.isNotEmpty()) list[list.size - 1] else null)
+        }
+        // java/util/Vector.elements:()Ljava/util/Enumeration;
+        nativeMethods["java/util/Vector.elements:()Ljava/util/Enumeration;"] = { frame ->
+            val obj = frame.pop() as? HeapObject
+            val list = obj?.instanceFields?.get("_data") as? List<Any?>
+            val enumObj = HeapObject("java/util/VectorEnumerator")
+            enumObj.instanceFields["_iterator"] = list?.iterator()
+            frame.push(enumObj)
+        }
 
         // java/util/Hashtable.<init>:()V
         nativeMethods["java/util/Hashtable.<init>:()V"] = { frame ->
@@ -1417,50 +1743,164 @@ object NativeMethodBridge {
             val map = obj?.instanceFields?.get("_data") as? Map<Any, Any?>
             frame.push(map?.get(key ?: ""))
         }
-
-        // java/util/Vector.contains:(Ljava/lang/Object;)Z
-        nativeMethods["java/util/Vector.contains:(Ljava/lang/Object;)Z"] = { frame ->
-            val element = frame.pop()
-            val obj = frame.pop() as? HeapObject
-            val list = obj?.instanceFields?.get("_data") as? List<Any?>
-            frame.push(if (list?.contains(element) == true) 1 else 0)
-        }
-        // java/util/Vector.indexOf:(Ljava/lang/Object;)I
-        nativeMethods["java/util/Vector.indexOf:(Ljava/lang/Object;)I"] = { frame ->
-            val element = frame.pop()
-            val obj = frame.pop() as? HeapObject
-            val list = obj?.instanceFields?.get("_data") as? List<Any?>
-            frame.push(list?.indexOf(element) ?: -1)
-        }
-        // java/util/Vector.setElementAt:(Ljava/lang/Object;I)V
-        nativeMethods["java/util/Vector.setElementAt:(Ljava/lang/Object;I)V"] = { frame ->
-            val index = frame.popInt()
-            val element = frame.pop()
-            val obj = frame.pop() as? HeapObject
-            val list = obj?.instanceFields?.get("_data") as? MutableList<Any?>
-            if (list != null && index >= 0 && index < list.size) {
-                list[index] = element
-            }
-        }
-        // java/util/Vector.removeElement:(Ljava/lang/Object;)Z
-        nativeMethods["java/util/Vector.removeElement:(Ljava/lang/Object;)Z"] = { frame ->
-            val element = frame.pop()
-            val obj = frame.pop() as? HeapObject
-            val list = obj?.instanceFields?.get("_data") as? MutableList<Any?>
-            frame.push(if (list?.remove(element) == true) 1 else 0)
-        }
-        // java/util/Vector.isEmpty:()Z
-        nativeMethods["java/util/Vector.isEmpty:()Z"] = { frame ->
-            val obj = frame.pop() as? HeapObject
-            val list = obj?.instanceFields?.get("_data") as? List<Any?>
-            frame.push(if (list?.isEmpty() == true) 1 else 0)
-        }
         // java/util/Hashtable.containsKey:(Ljava/lang/Object;)Z
         nativeMethods["java/util/Hashtable.containsKey:(Ljava/lang/Object;)Z"] = { frame ->
             val key = frame.pop()
             val obj = frame.pop() as? HeapObject
             val map = obj?.instanceFields?.get("_data") as? Map<Any, Any?>
             frame.push(if (map?.containsKey(key ?: "") == true) 1 else 0)
+        }
+        // java/util/Hashtable.remove:(Ljava/lang/Object;)Ljava/lang/Object;
+        nativeMethods["java/util/Hashtable.remove:(Ljava/lang/Object;)Ljava/lang/Object;"] = { frame ->
+            val key = frame.pop()
+            val obj = frame.pop() as? HeapObject
+            val map = obj?.instanceFields?.get("_data") as? MutableMap<Any, Any?>
+            frame.push(if (key != null) map?.remove(key) else null)
+        }
+        // java/util/Hashtable.clear:()V
+        nativeMethods["java/util/Hashtable.clear:()V"] = { frame ->
+            val obj = frame.pop() as? HeapObject
+            val map = obj?.instanceFields?.get("_data") as? MutableMap<Any, Any?>
+            map?.clear()
+        }
+        // java/util/Hashtable.size:()I
+        nativeMethods["java/util/Hashtable.size:()I"] = { frame ->
+            val obj = frame.pop() as? HeapObject
+            val map = obj?.instanceFields?.get("_data") as? Map<Any, Any?>
+            frame.push(map?.size ?: 0)
+        }
+        // java/util/Hashtable.keys:()Ljava/util/Enumeration;
+        nativeMethods["java/util/Hashtable.keys:()Ljava/util/Enumeration;"] = { frame ->
+            val obj = frame.pop() as? HeapObject
+            val map = obj?.instanceFields?.get("_data") as? Map<Any, Any?>
+            val enumObj = HeapObject("java/util/VectorEnumerator")
+            enumObj.instanceFields["_iterator"] = map?.keys?.iterator()
+            frame.push(enumObj)
+        }
+        // java/util/Hashtable.elements:()Ljava/util/Enumeration;
+        nativeMethods["java/util/Hashtable.elements:()Ljava/util/Enumeration;"] = { frame ->
+            val obj = frame.pop() as? HeapObject
+            val map = obj?.instanceFields?.get("_data") as? Map<Any, Any?>
+            val enumObj = HeapObject("java/util/VectorEnumerator")
+            enumObj.instanceFields["_iterator"] = map?.values?.iterator()
+            frame.push(enumObj)
+        }
+        
+        // java/util/Enumeration.hasMoreElements:()Z
+        nativeMethods["java/util/Enumeration.hasMoreElements:()Z"] = { frame ->
+            val obj = frame.pop() as? HeapObject
+            val iterator = obj?.instanceFields?.get("_iterator") as? Iterator<Any?>
+            frame.push(if (iterator?.hasNext() == true) 1 else 0)
+        }
+        // java/util/Enumeration.nextElement:()Ljava/lang/Object;
+        nativeMethods["java/util/Enumeration.nextElement:()Ljava/lang/Object;"] = { frame ->
+            val obj = frame.pop() as? HeapObject
+            val iterator = obj?.instanceFields?.get("_iterator") as? Iterator<Any?>
+            frame.push(iterator?.next())
+        }
+
+        // java/util/Random.<init>:()V
+        nativeMethods["java/util/Random.<init>:()V"] = { frame ->
+            val obj = frame.pop() as? HeapObject
+            obj?.instanceFields?.set("_rng", true)
+        }
+        // java/util/Random.<init>:(J)V
+        nativeMethods["java/util/Random.<init>:(J)V"] = { frame ->
+            frame.popLong() // seed
+            val obj = frame.pop() as? HeapObject
+            obj?.instanceFields?.set("_rng", true)
+        }
+        // java/util/Random.setSeed:(J)V
+        nativeMethods["java/util/Random.setSeed:(J)V"] = { frame ->
+            frame.popLong() // seed
+            frame.pop() // this
+        }
+        // java/util/Random.nextInt:(I)I
+        nativeMethods["java/util/Random.nextInt:(I)I"] = { frame ->
+            val n = frame.popInt()
+            frame.pop() // this
+            frame.push(if (n > 0) kotlin.random.Random.nextInt(n) else 0)
+        }
+        // java/util/Random.nextInt:()I
+        nativeMethods["java/util/Random.nextInt:()I"] = { frame ->
+            frame.pop() // this
+            frame.push(kotlin.random.Random.nextInt())
+        }
+        // java/util/Timer.<init>:()V
+        nativeMethods["java/util/Timer.<init>:()V"] = { frame ->
+            frame.pop() // this
+        }
+        // java/util/Timer.schedule:(Ljava/util/TimerTask;JJ)V
+        nativeMethods["java/util/Timer.schedule:(Ljava/util/TimerTask;JJ)V"] = { frame ->
+            val period = frame.popLong()
+            val delay = frame.popLong()
+            val taskObj = frame.pop() as? HeapObject
+            val thisObj = frame.pop() // this
+
+            if (taskObj != null) {
+                // Get the current interpreter to execute the task later
+                val interpreter = BytecodeInterpreter.activeInterpreter
+                if (interpreter != null) {
+                    println("[NativeBridge] Timer.schedule(task, delay=$delay, period=$period) RUNNING background")
+                    CoroutineScope(Dispatchers.Default).launch {
+                        delay(delay)
+                        while(true) {
+                            try {
+                                println("[NativeTimer] Executing TimerTask.run()")
+                                interpreter.executeMethod(taskObj.className, "run", "()V", arrayOf(taskObj))
+                            } catch (e: Exception) {
+                                println("[NativeTimer] Error in TimerTask: ${e.message}")
+                                break
+                            }
+                            if (period <= 0) break
+                            delay(period)
+                        }
+                    }
+                }
+            }
+        }
+        // java/util/Calendar.getInstance:()Ljava/util/Calendar;
+        nativeMethods["java/util/Calendar.getInstance:()Ljava/util/Calendar;"] = { frame ->
+            val cal = HeapObject("java/util/Calendar")
+            frame.push(cal)
+        }
+        // java/util/Calendar.get:(I)I
+        nativeMethods["java/util/Calendar.get:(I)I"] = { frame ->
+            val field = frame.popInt()
+            frame.pop() // this
+            // field: 1=YEAR, 2=MONTH, 5=DAY_OF_MONTH, 11=HOUR_OF_DAY, 12=MINUTE, 13=SECOND
+            frame.push(0) // Stub
+        }
+        // java/util/Calendar.setTime:(Ljava/util/Date;)V
+        nativeMethods["java/util/Calendar.setTime:(Ljava/util/Date;)V"] = { frame ->
+            frame.pop() // date
+            frame.pop() // this
+        }
+        // java/util/Date.<init>:()V
+        nativeMethods["java/util/Date.<init>:()V"] = { frame ->
+            frame.pop() // this
+        }
+        // java/util/Date.getTime:()J
+        nativeMethods["java/util/Date.getTime:()J"] = { frame ->
+            frame.pop() // this
+            frame.push(123456789L) // Stub
+        }
+    }
+
+    private fun registerJavaLangRuntime() {
+        nativeMethods["java/lang/Runtime.getRuntime:()Ljava/lang/Runtime;"] = { frame ->
+            frame.push(HeapObject("java/lang/Runtime"))
+        }
+        nativeMethods["java/lang/Runtime.freeMemory:()J"] = { frame ->
+            frame.pop() // this
+            frame.push(50 * 1024 * 1024L) // 50MB fake free
+        }
+        nativeMethods["java/lang/Runtime.totalMemory:()J"] = { frame ->
+            frame.pop() // this
+            frame.push(64 * 1024 * 1024L) // 64MB fake total
+        }
+        nativeMethods["java/lang/Runtime.gc:()V"] = { frame ->
+            frame.pop() // this
         }
     }
 

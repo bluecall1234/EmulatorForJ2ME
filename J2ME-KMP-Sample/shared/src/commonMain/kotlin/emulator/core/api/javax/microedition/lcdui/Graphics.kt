@@ -15,8 +15,10 @@ object Graphics {
     fun setColor(frame: ExecutionFrame) {
         val rgb = frame.popInt()
         val thisGraphics = frame.pop() as? HeapObject
-        thisGraphics?.instanceFields?.put("color:I", rgb)
-        // println("[J2ME Graphics] setColor(0x${rgb.toString(16).padStart(8, '0')})")
+        // J2ME setColor ignores the alpha and forces it to opaque
+        val opaqueRgb = (0xFF shl 24) or (rgb and 0xFFFFFF)
+        thisGraphics?.instanceFields?.put("color:I", opaqueRgb)
+        println("[J2ME Graphics] setColor(0x${rgb.toString(16).padStart(8, '0')}) -> 0x${opaqueRgb.toString(16)}")
     }
 
     /**
@@ -30,7 +32,7 @@ object Graphics {
         val thisGraphics = frame.pop() as? HeapObject
         val packed = (0xFF shl 24) or ((r and 0xFF) shl 16) or ((g and 0xFF) shl 8) or (b and 0xFF)
         thisGraphics?.instanceFields?.put("color:I", packed)
-        // println("[J2ME Graphics] setColor($r, $g, $b) -> 0x${packed.toString(16).padStart(8, '0')}")
+        println("[J2ME Graphics] setColorRGB($r, $g, $b) -> 0x${packed.toString(16).padStart(8, '0')}")
     }
 
     /**
@@ -58,7 +60,7 @@ object Graphics {
 
         val translateX = thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0
         val translateY = thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0
-        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0xFF000000.toInt()
 
         val targetImage = thisGraphics?.instanceFields?.get("_targetImage") as? HeapObject
         if (targetImage != null) {
@@ -71,7 +73,7 @@ object Graphics {
         } else {
             NativeGraphicsBridge.fillRect(x + translateX, y + translateY, w, h, color)
         }
-        // println("[J2ME Graphics] fillRect(x=${x + translateX}, y=${y + translateY}, w=$w, h=$h) color=0x${color.toString(16)}")
+        println("[J2ME Graphics] fillRect(x=${x + translateX}, y=${y + translateY}, w=$w, h=$h) color=0x${color.toString(16).padStart(8, '0')}")
     }
 
     private fun drawRectToBuffer(pixels: IntArray, imgW: Int, imgH: Int, x: Int, y: Int, w: Int, h: Int, color: Int) {
@@ -113,6 +115,7 @@ object Graphics {
         } else {
             NativeGraphicsBridge.drawImage(srcPixels, w, h, x + translateX, y + translateY, anchor)
         }
+        println("[J2ME Graphics] drawImage(w=$w, h=$h, x=${x + translateX}, y=${y + translateY})")
     }
 
     private fun drawImageToBuffer(src: IntArray, sw: Int, sh: Int, dest: IntArray, dw: Int, dh: Int, x: Int, y: Int, anchor: Int) {
@@ -149,6 +152,27 @@ object Graphics {
         val text = chars?.concatToString() ?: ""
 
         // String drawing to buffer not implemented yet
+        NativeGraphicsBridge.drawString(text, x + translateX, y + translateY, color)
+    }
+
+    /**
+     * javax.microedition.lcdui.Graphics.drawSubstring(Ljava/lang/String;IIIII)V
+     */
+    fun drawSubstring(frame: ExecutionFrame) {
+        val anchor = frame.popInt()
+        val len = frame.popInt()
+        val offset = frame.popInt()
+        val y = frame.popInt()
+        val x = frame.popInt()
+        val strObj = frame.pop() as? HeapObject
+        val thisGraphics = frame.pop() as? HeapObject
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0
+        
+        val translateX = thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0
+        val translateY = thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0
+
+        val text = (strObj?.instanceFields?.get("value") as? String ?: "").substring(offset, offset + len)
+
         NativeGraphicsBridge.drawString(text, x + translateX, y + translateY, color)
     }
 
@@ -256,6 +280,7 @@ object Graphics {
             }
             NativeGraphicsBridge.drawImage(subPixels, width, height, destX, destY, anchor)
         }
+        println("[J2ME Graphics] drawRegion(srcX=$srcX, srcY=$srcY, w=$width, h=$height, destX=$destX, destY=$destY)")
     }
 
     private fun drawRegionToBuffer(src: IntArray, sw: Int, sh: Int, sx: Int, sy: Int, w: Int, h: Int, 

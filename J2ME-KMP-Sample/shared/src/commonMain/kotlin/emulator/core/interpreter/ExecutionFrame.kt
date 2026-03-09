@@ -21,6 +21,7 @@ class ExecutionFrame(
     val maxStack: Int,
     val maxLocals: Int,
     val bytecode: ByteArray,
+    val exceptionTable: List<emulator.core.classfile.ExceptionTableEntry>,
     val className: String,
     val methodName: String,
     val interpreter: emulator.core.BytecodeInterpreter
@@ -73,6 +74,12 @@ class ExecutionFrame(
 
     fun peek(): Any? {
         return stack.lastOrNull()
+    }
+
+    /** Peek at the stack at a specific depth (0 is top) */
+    fun peekAt(indexFromTop: Int): Any? {
+        if (indexFromTop >= stack.size) return null
+        return stack[stack.size - 1 - indexFromTop]
     }
 
     fun stackSize(): Int = stack.size

@@ -59,8 +59,14 @@ actual class JarLoader actual constructor() {
         val zipFile = ZipFile(file)
         // Normalize name: remove leading slash if present
         val entryName = if (resourceName.startsWith("/")) resourceName.substring(1) else resourceName
-        val entry = zipFile.getEntry(entryName) ?: return null
+        val entry = zipFile.getEntry(entryName)
+        if (entry == null) {
+            println("[JarLoader] Resource NOT FOUND: $entryName in $filePath")
+            zipFile.close()
+            return null
+        }
 
+        println("[JarLoader] Loading resource: $entryName (${entry.size} bytes)")
         val bytes = zipFile.getInputStream(entry).use { it.readBytes() }
         zipFile.close()
         return bytes

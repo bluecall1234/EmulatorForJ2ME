@@ -43,7 +43,11 @@ actual object NativeGraphicsBridge {
     }
 
     actual fun decodeImage(data: ByteArray): ImageInfo? {
-        println("[iOS NativeGraphicsBridge] decodeImage: Not implemented")
+        return decodeImage(data, 0, data.size)
+    }
+
+    actual fun decodeImage(data: ByteArray, offset: Int, length: Int): ImageInfo? {
+        println("[iOS NativeGraphicsBridge] decodeImage (offset=$offset, length=$length): Not implemented")
         return null
     }
 }
