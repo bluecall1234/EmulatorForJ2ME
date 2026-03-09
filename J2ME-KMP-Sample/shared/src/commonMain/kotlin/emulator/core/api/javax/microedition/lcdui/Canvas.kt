@@ -13,11 +13,26 @@ object Canvas {
      * javax.microedition.lcdui.Canvas.repaint()V
      */
     fun repaint(frame: ExecutionFrame) {
-        val thisCanvas = frame.pop() as? HeapObject
+        val thisCanvas = frame.pop() as? HeapObject ?: return
+        val interpreter = frame.interpreter
         
-        // Trigger a render cycle on SDL2/Compose side.
+        // 1. Prepare a Graphics object for the paint() call
+        val graphics = HeapObject("javax/microedition/lcdui/Graphics")
+        graphics.instanceFields["color:I"] = 0xFF000000.toInt()
+        graphics.instanceFields["clipX:I"] = 0
+        graphics.instanceFields["clipY:I"] = 0
+        graphics.instanceFields["clipW:I"] = 240 // Default width
+        graphics.instanceFields["clipH:I"] = 320 // Default height
+        
+        // 2. Execute the game's paint(Graphics g) method
+        try {
+            interpreter.executeMethod(thisCanvas.className, "paint", "(Ljavax/microedition/lcdui/Graphics;)V", arrayOf(thisCanvas, graphics))
+        } catch (e: Exception) {
+            println("[J2ME Canvas] Error during paint(): ${e.message}")
+        }
+
+        // 3. Present the drawn buffer
         NativeGraphicsBridge.presentScreen()
-        // println("[J2ME Canvas] repaint() requested for $thisCanvas")
     }
 
     /**

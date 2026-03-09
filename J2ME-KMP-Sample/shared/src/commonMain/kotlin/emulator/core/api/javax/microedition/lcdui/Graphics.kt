@@ -160,10 +160,10 @@ object Graphics {
      */
     fun drawSubstring(frame: ExecutionFrame) {
         val anchor = frame.popInt()
-        val len = frame.popInt()
-        val offset = frame.popInt()
         val y = frame.popInt()
         val x = frame.popInt()
+        val len = frame.popInt()
+        val offset = frame.popInt()
         val strObj = frame.pop() as? HeapObject
         val thisGraphics = frame.pop() as? HeapObject
         val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0
@@ -171,7 +171,14 @@ object Graphics {
         val translateX = thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0
         val translateY = thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0
 
-        val text = (strObj?.instanceFields?.get("value") as? String ?: "").substring(offset, offset + len)
+        val chars = strObj?.instanceFields?.get("value:[C") as? CharArray
+        val fullText = chars?.concatToString() ?: ""
+        val text = try {
+            fullText.substring(offset, offset + len)
+        } catch (e: Exception) {
+            println("  [Graphics] drawSubstring error: offset=$offset, len=$len, fullTextLength=${fullText.length}")
+            ""
+        }
 
         NativeGraphicsBridge.drawString(text, x + translateX, y + translateY, color)
     }

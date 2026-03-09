@@ -92,18 +92,37 @@ object Opcodes {
     const val POP2         = 0x58  // Pop top 2 values
     const val DUP          = 0x59  // Duplicate top value
     const val DUP_X1       = 0x5A  // Duplicate top value, insert 2 deep
+    const val DUP_X2       = 0x5B  // Duplicate top value, insert 3 deep
+    const val DUP2         = 0x5C  // Duplicate top 2 values
+    const val DUP2_X1      = 0x5D  // Duplicate top 2 values, insert 3 deep
+    const val DUP2_X2      = 0x5E  // Duplicate top 2 values, insert 4 deep
     const val SWAP         = 0x5F  // Swap top 2 values
 
     // === Integer arithmetic ===
     const val IADD         = 0x60  // int add
     const val LADD         = 0x61  // long add
+    const val FADD         = 0x62  // float add
+    const val DADD         = 0x63  // double add
     const val ISUB         = 0x64  // int subtract
     const val LSUB         = 0x65  // long subtract
+    const val FSUB         = 0x66  // float subtract
+    const val DSUB         = 0x67  // double subtract
     const val IMUL         = 0x68  // int multiply
     const val LMUL         = 0x69  // long multiply
+    const val FMUL         = 0x6A  // float multiply
+    const val DMUL         = 0x6B  // double multiply
     const val IDIV         = 0x6C  // int divide
-    const val IREM         = 0x70  // int remainder (modulo)
+    const val LDIV         = 0x6D  // long divide
+    const val FDIV         = 0x6E  // float divide
+    const val DDIV         = 0x6F  // double divide
+    const val IREM         = 0x70  // int remainder
+    const val LREM         = 0x71  // long remainder
+    const val FREM         = 0x72  // float remainder
+    const val DREM         = 0x73  // double remainder
     const val INEG         = 0x74  // int negate
+    const val LNEG         = 0x75  // long negate
+    const val FNEG         = 0x76  // float negate
+    const val DNEG         = 0x77  // double negate
     const val ISHL         = 0x78  // int shift left
     const val LSHL         = 0x79  // long shift left
     const val ISHR         = 0x7A  // int shift right (signed)
@@ -120,6 +139,16 @@ object Opcodes {
     // === Type conversion ===
     const val I2L          = 0x85  // int to long
     const val I2F          = 0x86  // int to float
+    const val I2D          = 0x87  // int to double
+    const val L2I          = 0x88  // long to int
+    const val L2F          = 0x89  // long to float
+    const val L2D          = 0x8A  // long to double
+    const val F2I          = 0x8B  // float to int
+    const val F2L          = 0x8C  // float to long
+    const val F2D          = 0x8D  // float to double
+    const val D2I          = 0x8E  // double to int
+    const val D2L          = 0x8F  // double to long
+    const val D2F          = 0x90  // double to float
     const val I2B          = 0x91  // int to byte
     const val I2C          = 0x92  // int to char
     const val I2S          = 0x93  // int to short
@@ -247,15 +276,26 @@ object Opcodes {
             IASTORE -> "iastore"; LASTORE -> "lastore"; FASTORE -> "fastore"
             DASTORE -> "dastore"; AASTORE -> "aastore"; BASTORE -> "bastore"
             CASTORE -> "castore"; SASTORE -> "sastore"
-            POP -> "pop"; DUP -> "dup"; SWAP -> "swap"
-            IADD -> "iadd"; LADD -> "ladd"; ISUB -> "isub"; LSUB -> "lsub"
-            IMUL -> "imul"; LMUL -> "lmul"; IDIV -> "idiv"
-            IREM -> "irem"; INEG -> "ineg"
+            POP -> "pop"; POP2 -> "pop2"; DUP -> "dup"
+            DUP_X1 -> "dup_x1"; DUP_X2 -> "dup_x2"
+            DUP2 -> "dup2"; DUP2_X1 -> "dup2_x1"; DUP2_X2 -> "dup2_x2"
+            SWAP -> "swap"
+            IADD -> "iadd"; LADD -> "ladd"; FADD -> "fadd"; DADD -> "dadd"
+            ISUB -> "isub"; LSUB -> "lsub"; FSUB -> "fsub"; DSUB -> "dsub"
+            IMUL -> "imul"; LMUL -> "lmul"; FMUL -> "fmul"; DMUL -> "dmul"
+            IDIV -> "idiv"; LDIV -> "ldiv"; FDIV -> "fdiv"; DDIV -> "ddiv"
+            IREM -> "irem"; LREM -> "lrem"; FREM -> "frem"; DREM -> "drem"
+            INEG -> "ineg"; LNEG -> "lneg"; FNEG -> "fneg"; DNEG -> "dneg"
             ISHL -> "ishl"; LSHL -> "lshl"; ISHR -> "ishr"; LSHR -> "lshr"
             IUSHR -> "iushr"; LUSHR -> "lushr"
             IAND -> "iand"; LAND -> "land"; IOR -> "ior"; LOR -> "lor"
             IXOR -> "ixor"; LXOR -> "lxor"
             IFEQ -> "ifeq"; IFNE -> "ifne"
+            I2L -> "i2l"; I2F -> "i2f"; I2D -> "i2d"
+            L2I -> "l2i"; L2F -> "l2f"; L2D -> "l2d"
+            F2I -> "f2i"; F2L -> "f2l"; F2D -> "f2d"
+            D2I -> "d2i"; D2L -> "d2l"; D2F -> "d2f"
+            I2B -> "i2b"; I2C -> "i2c"; I2S -> "i2s"
             IFLT -> "iflt"; IFGE -> "ifge"
             IFGT -> "ifgt"; IFLE -> "ifle"
             IF_ICMPEQ -> "if_icmpeq"; IF_ICMPNE -> "if_icmpne"

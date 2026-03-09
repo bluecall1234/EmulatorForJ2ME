@@ -61,9 +61,9 @@ actual object NativeGraphicsBridge {
         val r = (color shr 16) and 0xFF
         val g = (color shr 8) and 0xFF
         val b = color and 0xFF
-        if (color != -1) {
-            println("[JNI] fillRect(x=$x, y=$y, w=$w, h=$h) color=0x${color.toString(16)} (ARGB: $alpha, $r, $g, $b)")
-        }
+        // if (color != -1) {
+        //     println("[JNI] fillRect(x=$x, y=$y, w=$w, h=$h) color=0x${color.toString(16)} (ARGB: $alpha, $r, $g, $b)")
+        // }
         NativeGraphicsBridgeJni.nativeFillRect(x, y, w, h, r, g, b, alpha)
     }
 

@@ -26,7 +26,7 @@ object NativeMethodBridge {
     private val nativeMethods = mutableMapOf<String, (ExecutionFrame) -> Unit>()
 
     init {
-        println("=== [NativeBridge] Initializing Native Method Bridge (Plan 19 Active) ===")
+        println("=== [NativeBridge] Initializing Native Method Bridge (Plan 21 Active) ===")
         // Register core implementations
         registerJavaLangSystem()
         registerJavaLangThread()
@@ -574,65 +574,6 @@ object NativeMethodBridge {
         }
     }
 
-    private fun registerJavaIoInputStream() {
-        // java/io/InputStream.read:()I
-        nativeMethods["java/io/InputStream.read:()I"] = { frame ->
-            val thisObj = frame.pop() as? HeapObject
-            val data = thisObj?.instanceFields?.get("_data:[B") as? ByteArray ?: ByteArray(0)
-            var pos = thisObj?.instanceFields?.get("_pos:I") as? Int ?: 0
-            
-            if (pos < data.size) {
-                val b = data[pos].toInt() and 0xFF
-                thisObj?.instanceFields?.set("_pos:I", pos + 1)
-                frame.push(b)
-            } else {
-                frame.push(-1)
-            }
-        }
-
-        // java/io/InputStream.read:([B)I
-        nativeMethods["java/io/InputStream.read:([B)I"] = { frame ->
-            val b = frame.pop() as? ByteArray ?: ByteArray(0)
-            val thisObj = frame.pop() as? HeapObject
-            
-            val data = thisObj?.instanceFields?.get("_data:[B") as? ByteArray ?: ByteArray(0)
-            var pos = thisObj?.instanceFields?.get("_pos:I") as? Int ?: 0
-            
-            if (pos >= data.size) {
-                frame.push(-1)
-            } else {
-                val toRead = minOf(b.size, data.size - pos)
-                data.copyInto(b, 0, pos, pos + toRead)
-                thisObj?.instanceFields?.set("_pos:I", pos + toRead)
-                frame.push(toRead)
-            }
-        }
-
-        // java/io/InputStream.close:()V
-        nativeMethods["java/io/InputStream.close:()V"] = { frame ->
-            frame.pop()
-        }
-
-        // java/io/InputStream.available:()I
-        nativeMethods["java/io/InputStream.available:()I"] = { frame ->
-            val thisObj = frame.pop() as? HeapObject
-            val data = thisObj?.instanceFields?.get("_data:[B") as? ByteArray ?: ByteArray(0)
-            val pos = thisObj?.instanceFields?.get("_pos:I") as? Int ?: 0
-            frame.push(maxOf(0, data.size - pos))
-        }
-
-        // java/io/InputStream.skip:(J)J
-        nativeMethods["java/io/InputStream.skip:(J)J"] = { frame ->
-            val n = frame.popLong()
-            val thisObj = frame.pop() as? HeapObject
-            val data = thisObj?.instanceFields?.get("_data:[B") as? ByteArray ?: ByteArray(0)
-            val pos = thisObj?.instanceFields?.get("_pos:I") as? Int ?: 0
-            
-            val toSkip = minOf(n, (data.size - pos).toLong()).toInt()
-            thisObj?.instanceFields?.set("_pos:I", pos + toSkip)
-            frame.push(toSkip.toLong())
-        }
-    }
 
     private fun registerJavaIoByteArrayOutputStream() {
         // java/io/ByteArrayOutputStream.<init>:()V
@@ -660,11 +601,26 @@ object NativeMethodBridge {
             val array = buffer?.toByteArray() ?: ByteArray(0)
             frame.push(array)
         }
-        // java/io/ByteArrayOutputStream.size:()I
-        nativeMethods["java/io/ByteArrayOutputStream.size:()I"] = { frame ->
+        // java/io/ByteArrayOutputStream.write:([BII)V
+        nativeMethods["java/io/ByteArrayOutputStream.write:([BII)V"] = { frame ->
+            val len = frame.popInt()
+            val off = frame.popInt()
+            val b = frame.pop() as? ByteArray
             val obj = frame.pop() as? HeapObject
-            val buffer = obj?.instanceFields?.get("_buffer") as? List<Byte>
-            frame.push(buffer?.size ?: 0)
+            val buffer = obj?.instanceFields?.get("_buffer") as? MutableList<Byte>
+            if (b != null && buffer != null) {
+                for (i in 0 until len) {
+                    if (off + i < b.size) {
+                        buffer.add(b[off + i])
+                    }
+                }
+            }
+        }
+        // java/io/ByteArrayOutputStream.reset:()V
+        nativeMethods["java/io/ByteArrayOutputStream.reset:()V"] = { frame ->
+            val obj = frame.pop() as? HeapObject
+            val buffer = obj?.instanceFields?.get("_buffer") as? MutableList<Byte>
+            buffer?.clear()
         }
     }
 
@@ -1136,6 +1092,7 @@ object NativeMethodBridge {
                     val b = data[pos].toInt()
                     inputStream.instanceFields["_pos:I"] = pos + 1
                     frame.push(b)
+                    // println("[NativeBridge] readByte -> $b")
                 } else {
                     // J2ME: throw EOFException
                     throw RuntimeException("java/io/EOFException")
@@ -1252,6 +1209,58 @@ object NativeMethodBridge {
                 frame.push(0L)
             }
         }
+
+        // java/io/DataInputStream.readFully:([B)V
+        nativeMethods["java/io/DataInputStream.readFully:([B)V"] = { frame ->
+            val b = frame.pop() as? ByteArray
+            val thisObj = frame.pop() as? HeapObject
+            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject
+            
+            if (inputStream != null && b != null) {
+                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
+                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
+                val len = b.size
+                if (pos + len <= data.size) {
+                    data.copyInto(b, 0, pos, pos + len)
+                    inputStream.instanceFields["_pos:I"] = pos + len
+                } else {
+                    throw RuntimeException("java/io/EOFException")
+                }
+            }
+        }
+        
+        // java/io/DataInputStream.readFully:([BII)V
+        nativeMethods["java/io/DataInputStream.readFully:([BII)V"] = { frame ->
+            val len = frame.popInt()
+            val off = frame.popInt()
+            val b = frame.pop() as? ByteArray
+            val thisObj = frame.pop() as? HeapObject
+            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject
+            
+            if (inputStream != null && b != null) {
+                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
+                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
+                if (pos + len <= data.size) {
+                    data.copyInto(b, off, pos, pos + len)
+                    inputStream.instanceFields["_pos:I"] = pos + len
+                } else {
+                    throw RuntimeException("java/io/EOFException")
+                }
+            }
+        }
+
+        // java/io/DataInputStream.available:()I
+        nativeMethods["java/io/DataInputStream.available:()I"] = { frame ->
+            val thisObj = frame.pop() as? HeapObject
+            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject
+            if (inputStream != null) {
+                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
+                val pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
+                frame.push(maxOf(0, data.size - pos))
+            } else {
+                frame.push(0)
+            }
+        }
     }
 
     private fun registerJavaIoDataOutputStream() {
@@ -1268,6 +1277,7 @@ object NativeMethodBridge {
             val out = thisObj?.instanceFields?.get("_stream") as? HeapObject
             val buffer = out?.instanceFields?.get("_buffer") as? MutableList<Byte>
             buffer?.add(b)
+            // println("[NativeBridge] writeByte -> $b")
         }
         // java/io/DataOutputStream.writeShort:(I)V
         nativeMethods["java/io/DataOutputStream.writeShort:(I)V"] = { frame ->
@@ -1292,6 +1302,129 @@ object NativeMethodBridge {
         // java/io/DataOutputStream.close:()V
         nativeMethods["java/io/DataOutputStream.close:()V"] = { frame ->
             frame.pop()
+        }
+    }
+
+    private fun registerJavaIoInputStream() {
+        println("[NativeBridge] Registering java/io/InputStream methods")
+        // java/io/InputStream.read:([BII)I
+        // Note: DataInputStream often inherits this or overrides it.
+        val readByteArray: (ExecutionFrame) -> Unit = { frame ->
+            val len = frame.popInt()
+            val offset = frame.popInt()
+            val b = frame.pop() as? ByteArray
+            val thisObj = frame.pop() as? HeapObject
+            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject ?: thisObj
+            
+            if (inputStream != null) {
+                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
+                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
+                if (pos >= data.size) {
+                    frame.push(-1) // EOF
+                } else {
+                    val count = minOf(len, data.size - pos)
+                    if (b != null) {
+                        data.copyInto(b, offset, pos, pos + count)
+                    }
+                    inputStream.instanceFields["_pos:I"] = pos + count
+                    frame.push(count)
+                }
+            } else {
+                frame.push(-1)
+            }
+        }
+        
+        nativeMethods["java/io/InputStream.read:([BII)I"] = readByteArray
+        nativeMethods["java/io/DataInputStream.read:([BII)I"] = readByteArray
+
+        // java/io/InputStream.read:([B)I
+        nativeMethods["java/io/InputStream.read:([B)I"] = { frame ->
+            val b = frame.pop() as? ByteArray
+            val thisObj = frame.pop() as? HeapObject
+            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject ?: thisObj
+            
+            if (inputStream != null && b != null) {
+                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
+                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
+                if (pos >= data.size) {
+                    frame.push(-1) // EOF
+                } else {
+                    val count = minOf(b.size, data.size - pos)
+                    data.copyInto(b, 0, pos, pos + count)
+                    inputStream.instanceFields["_pos:I"] = pos + count
+                    frame.push(count)
+                }
+            } else {
+                frame.push(-1)
+            }
+        }
+        
+        // java/io/InputStream.read:()I
+        nativeMethods["java/io/InputStream.read:()I"] = { frame ->
+            val thisObj = frame.pop() as? HeapObject
+            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject ?: thisObj
+            if (inputStream != null) {
+                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
+                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
+                if (pos < data.size) {
+                    val b = data[pos].toInt() and 0xFF
+                    inputStream.instanceFields["_pos:I"] = pos + 1
+                    frame.push(b)
+                }
+            } else {
+                frame.push(-1)
+            }
+        }
+
+        // java/io/InputStream.close:()V
+        nativeMethods["java/io/InputStream.close:()V"] = { frame ->
+            frame.pop()
+        }
+
+        // java/io/InputStream.available:()I
+        nativeMethods["java/io/InputStream.available:()I"] = { frame ->
+            val thisObj = frame.pop() as? HeapObject
+            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject ?: thisObj
+            val data = inputStream?.instanceFields?.get("_data:[B") as? ByteArray ?: ByteArray(0)
+            val pos = inputStream?.instanceFields?.get("_pos:I") as? Int ?: 0
+            frame.push(maxOf(0, data.size - pos))
+        }
+
+        // java/io/InputStream.skip:(J)J
+        nativeMethods["java/io/InputStream.skip:(J)J"] = { frame ->
+            val n = frame.popLong()
+            val thisObj = frame.pop() as? HeapObject
+            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject ?: thisObj
+            val data = inputStream?.instanceFields?.get("_data:[B") as? ByteArray ?: ByteArray(0)
+            val pos = inputStream?.instanceFields?.get("_pos:I") as? Int ?: 0
+            
+            val toSkip = minOf(n, (data.size - pos).toLong()).toInt()
+            inputStream?.instanceFields?.set("_pos:I", pos + toSkip)
+            frame.push(toSkip.toLong())
+        }
+
+        // java/io/ByteArrayInputStream.<init>:([B)V
+        nativeMethods["java/io/ByteArrayInputStream.<init>:([B)V"] = { frame ->
+            val data = frame.pop() as? ByteArray ?: ByteArray(0)
+            val thisObj = frame.pop() as? HeapObject
+            thisObj?.instanceFields?.set("_data:[B", data)
+            thisObj?.instanceFields?.set("_pos:I", 0)
+        }
+        
+        // java/io/ByteArrayInputStream.<init>:([BII)V
+        nativeMethods["java/io/ByteArrayInputStream.<init>:([BII)V"] = { frame ->
+            val len = frame.popInt()
+            val off = frame.popInt()
+            val data = frame.pop() as? ByteArray ?: ByteArray(0)
+            val thisObj = frame.pop() as? HeapObject
+            
+            val sliced = if (off >= 0 && off + len <= data.size) {
+                data.copyOfRange(off, off + len)
+            } else {
+                ByteArray(0)
+            }
+            thisObj?.instanceFields?.set("_data:[B", sliced)
+            thisObj?.instanceFields?.set("_pos:I", 0)
         }
     }
 

@@ -328,7 +328,6 @@ Tôi đã thực hiện các thay đổi sau:
 3. **Bridge `InputStream`** : Implement các hàm `read()` và `close()` native để game có thể đọc được dữ liệu binary.
 4. **Fix Graphics** : Đảm bảo `Graphics.drawImage` lấy đúng dữ liệu pixel từ đối tượng `Image`.
 
-
 Tôi đã xử lý được lỗi crash tiếp theo của game `Bounce Tales`!
 
 **Nguyên nhân gây crash:**
@@ -347,7 +346,6 @@ Tôi đã xử lý được lỗi crash tiếp theo của game `Bounce Tales`!
 
 1. **Tối ưu Interpreter** : Đã cập nhật logic khởi tạo để bỏ qua các khối lệnh tĩnh (`clinit`) của các class native shell, vì chúng không có bytecode để chạy.
 
-
 Tôi đã tìm ra nguyên nhân gây ra màn hình đen và thực hiện các chỉnh sửa để khắc phục!
 
 **Phân tích và Giải pháp:**
@@ -362,7 +360,6 @@ Tôi đã tìm ra nguyên nhân gây ra màn hình đen và thực hiện các c
 * Hỗ trợ các hàm tiện ích của luồng dữ liệu (`InputStream.available`, `skip`).
 * Stub các hàm về Font để tránh lỗi khi game tính toán độ rộng của chữ.
 
-
 **Nguyên nhân cụ thể:** Game `Bounce Tales` bị obfuscate (làm rối mã nguồn), nên nó gọi các hàm thông qua các lớp trung gian như `p.getWidth()`. Trong phiên bản trước, emulator của chúng ta chỉ tìm hàm `getWidth()` trong chính lớp `p`. Vì lớp `p` không trực tiếp định nghĩa hàm này mà nó kế thừa từ `Displayable`, nên emulator đã không tìm thấy và trả về giá trị 0. Điều này làm cho game vẽ các hình có kích thước 0x0, dẫn đến màn hình đen.
 
 **Các cải tiến tôi vừa thực hiện:**
@@ -375,14 +372,11 @@ Tôi đã tìm ra nguyên nhân gây ra màn hình đen và thực hiện các c
 
 1. **Khắc phục lỗi biên dịch** : Tôi đã dọn dẹp các hàm trùng lặp và sửa các tham chiếu lỗi trong mã nguồn.
 
-
-
 **Phân tích và Fix:**
 
 1. **Lỗi Hierarchy Traversal (Chặn tìm kiếm phân cấp)** : Trước đó, tôi đã thêm một cơ chế "fallback" trong `NativeMethodBridge` để xử lý các hàm chưa cài đặt. Tuy nhiên, cơ chế này vô tình chặn đứng việc tìm kiếm ngược lên lớp cha. Ví dụ: khi game gọi `p.getWidth()`, nó dừng ngay tại lớp `p` và trả về 0, thay vì tìm tiếp lên lớp `Canvas` hoặc `Displayable`. Tôi đã gỡ bỏ rào cản này.
 2. **Định nghĩa Phân cấp Lớp Native (Shell Inheritance)** : Tôi phát hiện ra các lớp "vỏ" (native shell) như `GameCanvas` hay `Canvas` chưa có thông tin về lớp cha. Tôi đã cập nhật `SimpleKMPInterpreter` để các lớp này "biết" cha của chúng là ai (ví dụ: `GameCanvas` -> `Canvas` -> `Displayable`).
 3. **Kết quả** : Bây giờ, cơ chế tìm kiếm hàm sẽ hoạt động hoàn hảo. `p.getWidth()` sẽ tìm xuyên qua các lớp và lấy được giá trị `240` (chiều rộng màn hình) từ lớp `Displayable`. Nhờ đó, các hàm vẽ (`fillRect`, `drawImage`) sẽ nhận được thông số kích thước đúng thay vì `0x0`.
-
 
 Tôi đã bổ sung các thành phần "vốn liếng" quan trọng nhất để game có thể hiển thị hình ảnh!
 
@@ -392,17 +386,15 @@ Tôi đã bổ sung các thành phần "vốn liếng" quan trọng nhất để
 2. **Hỗ trợ Mutable Image (Bộ đệm hình ảnh)** : Game thường tự tạo một ảnh trống để làm "back-buffer" rồi vẽ lên đó trước khi đẩy ra màn hình. Tôi đã cài đặt hàm `createImage(w, h)` và `Image.getGraphics()` để cho phép game thực hiện việc này.
 3. **Sửa lỗi treo lúc khởi động** : Tôi phát hiện game bị dừng ngay tại hàm khởi tạo `Object.<init>` do thiếu bridge. Tôi đã bổ sung nó để đảm bảo luồng thực thi thông suốt.
 4. **Dọn dẹp mã nguồn** : Đã sửa một số lỗi cú pháp phát sinh trong file `NativeMethodBridge.kt` và đảm bảo việc đăng ký các hàm UI được nhất quán.
+5. **Dừng ghi log tràn lan (Opcode Logging)** : Trước đó, máy ảo đang ghi log từng lệnh bytecode một (`[VM] PC=...`). Một game chạy hàng triệu lệnh mỗi giây nên việc tạo chuỗi văn bản liên tục đã khiến bộ nhớ bị quá tải, ép hệ thống phải chạy GC (Garbage Collection) liên tục. Tôi đã tắt chế độ debug này mặc định.
+6. **Sửa lỗi `Object.wait()`** : Đây là một lỗi "âm thầm" rất nguy hiểm. Game thường dùng hàm này để điều khiển tốc độ (framerate). Trước đó hàm này bị bỏ trống (stub), khiến game bị "vượt rào" chạy với tốc độ tối đa của CPU mà không nghỉ, gây nóng máy và tạo ra hàng tỷ rác bộ nhớ. Tôi đã thêm lệnh `delay` thực sự vào đây.
+7. **Tối ưu hóa Graphics Log** : Tôi cũng đã tắt các log trong phần vẽ hình (`setColor`, `fillRect`) vì chúng được gọi hàng trăm lần mỗi khung hình.
+8. **Hoàn thiện luồng vẽ của Canvas** : Đã thêm `Canvas.repaint()` và `serviceRepaints()` để đảm bảo game có thể yêu cầu vẽ lại màn hình bất cứ lúc nào.
+9. **Hệ thống Log chẩn đoán hình ảnh** : Bây giờ mỗi khi game nạp ảnh, log sẽ hiện rõ là thành công hay thất bại (ví dụ: `[NativeBridge] Image.createImage SUCCESS`).
+10. **Theo dõi hoạt động JNI** : Đã thêm log định kỳ vào phần xử lý đồ họa native (C++) để xác nhận xem dữ liệu hình ảnh có thực sự được gửi tới màn hình Android hay không.
+11. **Lightweight Call Trace** : Tôi đã thêm một cơ chế theo dõi nhẹ nhàng, sẽ in ra tên các hàm mà game đang gọi (như `p.run`, `a.init`) mà không làm nặng máy như việc ghi log toàn bộ bytecode trước đây.
 
-
-1. **Dừng ghi log tràn lan (Opcode Logging)** : Trước đó, máy ảo đang ghi log từng lệnh bytecode một (`[VM] PC=...`). Một game chạy hàng triệu lệnh mỗi giây nên việc tạo chuỗi văn bản liên tục đã khiến bộ nhớ bị quá tải, ép hệ thống phải chạy GC (Garbage Collection) liên tục. Tôi đã tắt chế độ debug này mặc định.
-2. **Sửa lỗi `Object.wait()`** : Đây là một lỗi "âm thầm" rất nguy hiểm. Game thường dùng hàm này để điều khiển tốc độ (framerate). Trước đó hàm này bị bỏ trống (stub), khiến game bị "vượt rào" chạy với tốc độ tối đa của CPU mà không nghỉ, gây nóng máy và tạo ra hàng tỷ rác bộ nhớ. Tôi đã thêm lệnh `delay` thực sự vào đây.
-3. **Tối ưu hóa Graphics Log** : Tôi cũng đã tắt các log trong phần vẽ hình (`setColor`, `fillRect`) vì chúng được gọi hàng trăm lần mỗi khung hình.
-
-
-1. **Hoàn thiện luồng vẽ của Canvas** : Đã thêm `Canvas.repaint()` và `serviceRepaints()` để đảm bảo game có thể yêu cầu vẽ lại màn hình bất cứ lúc nào.
-2. **Hệ thống Log chẩn đoán hình ảnh** : Bây giờ mỗi khi game nạp ảnh, log sẽ hiện rõ là thành công hay thất bại (ví dụ: `[NativeBridge] Image.createImage SUCCESS`).
-3. **Theo dõi hoạt động JNI** : Đã thêm log định kỳ vào phần xử lý đồ họa native (C++) để xác nhận xem dữ liệu hình ảnh có thực sự được gửi tới màn hình Android hay không.
-4. **Lightweight Call Trace** : Tôi đã thêm một cơ chế theo dõi nhẹ nhàng, sẽ in ra tên các hàm mà game đang gọi (như `p.run`, `a.init`) mà không làm nặng máy như việc ghi log toàn bộ bytecode trước đây.
+Tôi đã phát hiện ra game đang bị loop ở lệnh `String.trim()` do chúng ta chưa implement hàm này trong Native Bridge. Điều này lý giải tại sao màn hình vẫn đen và log liên tục báo `Lookup failed for: java/lang/Object.trim`.
 
 ---
 
@@ -430,6 +422,12 @@ Tôi đã bổ sung các thành phần "vốn liếng" quan trọng nhất để
 ### Ghi chú kỹ thuật
 
 - Tích hợp vòng lặp mô phỏng nằm trong `EmulatorThread` để đảm bảo UI mượt. Game loop C++ sẽ được tối ưu hoá lại tuỳ trường hợp.
+
+
+
+1. **Fix Opcode dup2 & Arithmetic** : Đã bổ sung `dup2` (0x5c), `LREM` (0x71) và hàng loạt opcode tính toán/chuyển đổi kiểu dữ liệu (conversion opcodes) cần thiết.
+2. **Sửa lỗi Graphics.drawSubstring** : Sửa lỗi sai thứ tự tham số pop từ stack, loại bỏ hoàn toàn lỗi `StringIndexOutOfBoundsException`.
+3. **Kết quả** : Game hiện tại đã build thành công, cài đặt ổn định và đã vào tới vòng lặp render đồ họa (gọi `drawRegion`).
 
 ---
 

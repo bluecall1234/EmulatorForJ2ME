@@ -162,6 +162,94 @@ class ExecutionEngine(
                     frame.push(v2)
                     frame.push(v1)
                 }
+                Opcodes.DUP_X2 -> {
+                    val v1 = frame.pop()
+                    val v2 = frame.pop()
+                    if (v2 is Long || v2 is Double) {
+                        // Form 2: v1 is Category 1, v2 is Category 2
+                        frame.push(v1)
+                        frame.push(v2)
+                        frame.push(v1)
+                    } else {
+                        // Form 1: v1, v2, v3 are Category 1
+                        val v3 = frame.pop()
+                        frame.push(v1)
+                        frame.push(v3)
+                        frame.push(v2)
+                        frame.push(v1)
+                    }
+                }
+                Opcodes.DUP2 -> {
+                    val v1 = frame.pop()
+                    if (v1 is Long || v1 is Double) {
+                        // Form 2: v1 is Category 2
+                        frame.push(v1)
+                        frame.push(v1)
+                    } else {
+                        // Form 1: v1, v2 are Category 1
+                        val v2 = frame.pop()
+                        frame.push(v2)
+                        frame.push(v1)
+                        frame.push(v2)
+                        frame.push(v1)
+                    }
+                }
+                Opcodes.DUP2_X1 -> {
+                    val v1 = frame.pop()
+                    val v2 = frame.pop()
+                    if (v1 is Long || v1 is Double) {
+                        // Form 2: v1 is Category 2, v2 is Category 1
+                        frame.push(v1)
+                        frame.push(v2)
+                        frame.push(v1)
+                    } else {
+                        // Form 1: v1, v2, v3 are Category 1
+                        val v3 = frame.pop()
+                        frame.push(v2)
+                        frame.push(v1)
+                        frame.push(v3)
+                        frame.push(v2)
+                        frame.push(v1)
+                    }
+                }
+                Opcodes.DUP2_X2 -> {
+                    val v1 = frame.pop()
+                    val v2 = frame.pop()
+                    if (v1 is Long || v1 is Double) {
+                        if (v2 is Long || v2 is Double) {
+                            // Form 4: v1(Cat2), v2(Cat2)
+                            frame.push(v1)
+                            frame.push(v2)
+                            frame.push(v1)
+                        } else {
+                            // Form 2: v1(Cat2), v2(Cat1), v3(Cat1)
+                            val v3 = frame.pop()
+                            frame.push(v1)
+                            frame.push(v3)
+                            frame.push(v2)
+                            frame.push(v1)
+                        }
+                    } else {
+                        val v3 = frame.pop()
+                        if (v3 is Long || v3 is Double) {
+                            // Form 3: v1(Cat1), v2(Cat1), v3(Cat2)
+                            frame.push(v2)
+                            frame.push(v1)
+                            frame.push(v3)
+                            frame.push(v2)
+                            frame.push(v1)
+                        } else {
+                            // Form 1: v1, v2, v3, v4 all Category 1
+                            val v4 = frame.pop()
+                            frame.push(v2)
+                            frame.push(v1)
+                            frame.push(v4)
+                            frame.push(v3)
+                            frame.push(v2)
+                            frame.push(v1)
+                        }
+                    }
+                }
                 Opcodes.SWAP -> {
                     val v1 = frame.pop()
                     val v2 = frame.pop()
@@ -251,10 +339,68 @@ class ExecutionEngine(
                     val b = frame.popLong(); val a = frame.popLong()
                     frame.push(a or b)
                 }
+                Opcodes.LDIV -> {
+                    val b = frame.popLong(); val a = frame.popLong()
+                    if (b == 0L) throw ArithmeticException("Division by zero")
+                    frame.push(a / b)
+                }
+                Opcodes.LREM -> {
+                    val b = frame.popLong(); val a = frame.popLong()
+                    if (b == 0L) throw ArithmeticException("Division by zero")
+                    frame.push(a % b)
+                }
+                Opcodes.LNEG -> frame.push(-frame.popLong())
                 Opcodes.LXOR -> {
                     val b = frame.popLong(); val a = frame.popLong()
                     frame.push(a xor b)
                 }
+
+                // === FLOAT ARITHMETIC ===
+                Opcodes.FADD -> {
+                    val b = frame.pop() as Float; val a = frame.pop() as Float
+                    frame.push(a + b)
+                }
+                Opcodes.FSUB -> {
+                    val b = frame.pop() as Float; val a = frame.pop() as Float
+                    frame.push(a - b)
+                }
+                Opcodes.FMUL -> {
+                    val b = frame.pop() as Float; val a = frame.pop() as Float
+                    frame.push(a * b)
+                }
+                Opcodes.FDIV -> {
+                    val b = frame.pop() as Float; val a = frame.pop() as Float
+                    frame.push(a / b)
+                }
+                Opcodes.FREM -> {
+                    val b = frame.pop() as Float; val a = frame.pop() as Float
+                    frame.push(a % b)
+                }
+                Opcodes.FNEG -> frame.push(-(frame.pop() as Float))
+
+                // === DOUBLE ARITHMETIC ===
+                Opcodes.DADD -> {
+                    val b = frame.pop() as Double; val a = frame.pop() as Double
+                    frame.push(a + b)
+                }
+                Opcodes.DSUB -> {
+                    val b = frame.pop() as Double; val a = frame.pop() as Double
+                    frame.push(a - b)
+                }
+                Opcodes.DMUL -> {
+                    val b = frame.pop() as Double; val a = frame.pop() as Double
+                    frame.push(a * b)
+                }
+                Opcodes.DDIV -> {
+                    val b = frame.pop() as Double; val a = frame.pop() as Double
+                    frame.push(a / b)
+                }
+                Opcodes.DREM -> {
+                    val b = frame.pop() as Double; val a = frame.pop() as Double
+                    frame.push(a % b)
+                }
+                Opcodes.DNEG -> frame.push(-(frame.pop() as Double))
+
                 Opcodes.LCMP -> {
                     val b = frame.popLong(); val a = frame.popLong()
                     frame.push(a.compareTo(b))
@@ -289,6 +435,16 @@ class ExecutionEngine(
                 // === TYPE CONVERSION ===
                 Opcodes.I2L -> frame.push(frame.popInt().toLong())
                 Opcodes.I2F -> frame.push(frame.popInt().toFloat())
+                Opcodes.I2D -> frame.push(frame.popInt().toDouble())
+                Opcodes.L2I -> frame.push(frame.popLong().toInt())
+                Opcodes.L2F -> frame.push(frame.popLong().toFloat())
+                Opcodes.L2D -> frame.push(frame.popLong().toDouble())
+                Opcodes.F2I -> frame.push((frame.pop() as Float).toInt())
+                Opcodes.F2L -> frame.push((frame.pop() as Float).toLong())
+                Opcodes.F2D -> frame.push((frame.pop() as Float).toDouble())
+                Opcodes.D2I -> frame.push((frame.pop() as Double).toInt())
+                Opcodes.D2L -> frame.push((frame.pop() as Double).toLong())
+                Opcodes.D2F -> frame.push((frame.pop() as Double).toFloat())
                 Opcodes.I2B -> frame.push(frame.popInt().toByte().toInt())
                 Opcodes.I2C -> frame.push(frame.popInt() and 0xFFFF)
                 Opcodes.I2S -> frame.push(frame.popInt().toShort().toInt())
