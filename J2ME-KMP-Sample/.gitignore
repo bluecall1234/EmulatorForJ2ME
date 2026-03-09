@@ -5,6 +5,7 @@
 # ─── Gradle ───────────────────────────────────────────────
 .gradle/
 build/
+debug_log/
 **/build/
 !gradle/wrapper/gradle-wrapper.jar
 local.properties

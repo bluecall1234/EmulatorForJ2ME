@@ -15,6 +15,8 @@ object Graphics {
     const val TOP = 16
     const val BOTTOM = 32
     const val BASELINE = 64
+    const val SOLID = 0
+    const val DOTTED = 1
 
     /**
      * javax.microedition.lcdui.Graphics.setColor(I)V
@@ -82,6 +84,245 @@ object Graphics {
             NativeGraphicsBridge.fillRect(x + translateX, y + translateY, w, h, color)
         }
         println("[J2ME Graphics] fillRect(x=${x + translateX}, y=${y + translateY}, w=$w, h=$h) color=0x${color.toString(16).padStart(8, '0')}")
+    }
+
+    /**
+     * javax.microedition.lcdui.Graphics.drawRect(IIII)V
+     */
+    fun drawRect(frame: ExecutionFrame) {
+        val h = frame.popInt()
+        val w = frame.popInt()
+        val y = frame.popInt()
+        val x = frame.popInt()
+        val thisGraphics = frame.pop() as? HeapObject
+
+        val translateX = thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0
+        val translateY = thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0xFF000000.toInt()
+
+        val targetImage = thisGraphics?.instanceFields?.get("_targetImage") as? HeapObject
+        if (targetImage != null) {
+            val pixels = targetImage.instanceFields["rgb:[I"] as? IntArray
+            val imgW = targetImage.instanceFields["width:I"] as? Int ?: 0
+            val imgH = targetImage.instanceFields["height:I"] as? Int ?: 0
+            if (pixels != null) {
+                drawRectOutlineToBuffer(pixels, imgW, imgH, x + translateX, y + translateY, w, h, color)
+            }
+        } else {
+            NativeGraphicsBridge.drawRect(x + translateX, y + translateY, w, h, color)
+        }
+    }
+
+    private fun drawRectOutlineToBuffer(pixels: IntArray, imgW: Int, imgH: Int, x: Int, y: Int, w: Int, h: Int, color: Int) {
+        // Top and Bottom
+        for (ix in x..x + w) {
+            if (ix !in 0 until imgW) continue
+            if (y in 0 until imgH) pixels[y * imgW + ix] = color
+            if (y + h in 0 until imgH) pixels[(y + h) * imgW + ix] = color
+        }
+        // Left and Right
+        for (iy in y..y + h) {
+            if (iy !in 0 until imgH) continue
+            if (x in 0 until imgW) pixels[iy * imgW + x] = color
+            if (x + w in 0 until imgW) pixels[iy * imgW + (x + w)] = color
+        }
+    }
+
+    /**
+     * javax.microedition.lcdui.Graphics.drawLine(IIII)V
+     */
+    fun drawLine(frame: ExecutionFrame) {
+        val y2 = frame.popInt()
+        val x2 = frame.popInt()
+        val y1 = frame.popInt()
+        val x1 = frame.popInt()
+        val thisGraphics = frame.pop() as? HeapObject
+
+        val translateX = thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0
+        val translateY = thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0xFF000000.toInt()
+
+        val targetImage = thisGraphics?.instanceFields?.get("_targetImage") as? HeapObject
+        if (targetImage != null) {
+            val pixels = targetImage.instanceFields["rgb:[I"] as? IntArray
+            val imgW = targetImage.instanceFields["width:I"] as? Int ?: 0
+            val imgH = targetImage.instanceFields["height:I"] as? Int ?: 0
+            if (pixels != null) {
+                drawLineToBuffer(pixels, imgW, imgH, x1 + translateX, y1 + translateY, x2 + translateX, y2 + translateY, color)
+            }
+        } else {
+            NativeGraphicsBridge.drawLine(x1 + translateX, y1 + translateY, x2 + translateX, y2 + translateY, color)
+        }
+    }
+
+    /**
+     * javax.microedition.lcdui.Graphics.drawArc(IIIIII)V
+     */
+    fun drawArc(frame: ExecutionFrame) {
+        val arcAngle = frame.popInt()
+        val startAngle = frame.popInt()
+        val h = frame.popInt()
+        val w = frame.popInt()
+        val y = frame.popInt()
+        val x = frame.popInt()
+        val thisGraphics = frame.pop() as? HeapObject
+
+        val translateX = thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0
+        val translateY = thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0xFF000000.toInt()
+
+        val targetImage = thisGraphics?.instanceFields?.get("_targetImage") as? HeapObject
+        if (targetImage != null) {
+            // Stub for buffer path
+        } else {
+            NativeGraphicsBridge.drawArc(x + translateX, y + translateY, w, h, startAngle, arcAngle, color, false)
+        }
+    }
+
+    /**
+     * javax.microedition.lcdui.Graphics.fillArc(IIIIII)V
+     */
+    fun fillArc(frame: ExecutionFrame) {
+        val arcAngle = frame.popInt()
+        val startAngle = frame.popInt()
+        val h = frame.popInt()
+        val w = frame.popInt()
+        val y = frame.popInt()
+        val x = frame.popInt()
+        val thisGraphics = frame.pop() as? HeapObject
+
+        val translateX = thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0
+        val translateY = thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0xFF000000.toInt()
+
+        val targetImage = thisGraphics?.instanceFields?.get("_targetImage") as? HeapObject
+        if (targetImage != null) {
+            // Stub for buffer path
+        } else {
+            NativeGraphicsBridge.drawArc(x + translateX, y + translateY, w, h, startAngle, arcAngle, color, true)
+        }
+    }
+
+    /**
+     * javax.microedition.lcdui.Graphics.drawRoundRect(IIIIII)V
+     */
+    fun drawRoundRect(frame: ExecutionFrame) {
+        val arcH = frame.popInt()
+        val arcW = frame.popInt()
+        val h = frame.popInt()
+        val w = frame.popInt()
+        val y = frame.popInt()
+        val x = frame.popInt()
+        val thisGraphics = frame.pop() as? HeapObject
+
+        val translateX = thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0
+        val translateY = thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0xFF000000.toInt()
+
+        val targetImage = thisGraphics?.instanceFields?.get("_targetImage") as? HeapObject
+        if (targetImage != null) {
+            // Stub for buffer path
+        } else {
+            NativeGraphicsBridge.drawRoundRect(x + translateX, y + translateY, w, h, arcW, arcH, color, false)
+        }
+    }
+
+    /**
+     * javax.microedition.lcdui.Graphics.fillRoundRect(IIIIII)V
+     */
+    fun fillRoundRect(frame: ExecutionFrame) {
+        val arcH = frame.popInt()
+        val arcW = frame.popInt()
+        val h = frame.popInt()
+        val w = frame.popInt()
+        val y = frame.popInt()
+        val x = frame.popInt()
+        val thisGraphics = frame.pop() as? HeapObject
+
+        val translateX = thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0
+        val translateY = thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0xFF000000.toInt()
+
+        val targetImage = thisGraphics?.instanceFields?.get("_targetImage") as? HeapObject
+        if (targetImage != null) {
+            // Stub for buffer path
+        } else {
+            NativeGraphicsBridge.drawRoundRect(x + translateX, y + translateY, w, h, arcW, arcH, color, true)
+        }
+    }
+
+    /**
+     * javax.microedition.lcdui.Graphics.drawTriangle(IIIIII)V
+     */
+    fun drawTriangle(frame: ExecutionFrame) {
+        val y3 = frame.popInt()
+        val x3 = frame.popInt()
+        val y2 = frame.popInt()
+        val x2 = frame.popInt()
+        val y1 = frame.popInt()
+        val x1 = frame.popInt()
+        val thisGraphics = frame.pop() as? HeapObject
+
+        val translateX = thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0
+        val translateY = thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0xFF000000.toInt()
+
+        val targetImage = thisGraphics?.instanceFields?.get("_targetImage") as? HeapObject
+        if (targetImage != null) {
+            val pixels = targetImage.instanceFields["rgb:[I"] as? IntArray
+            val imgW = targetImage.instanceFields["width:I"] as? Int ?: 0
+            val imgH = targetImage.instanceFields["height:I"] as? Int ?: 0
+            if (pixels != null) {
+                drawLineToBuffer(pixels, imgW, imgH, x1 + translateX, y1 + translateY, x2 + translateX, y2 + translateY, color)
+                drawLineToBuffer(pixels, imgW, imgH, x2 + translateX, y2 + translateY, x3 + translateX, y3 + translateY, color)
+                drawLineToBuffer(pixels, imgW, imgH, x3 + translateX, y3 + translateY, x1 + translateX, y1 + translateY, color)
+            }
+        } else {
+            NativeGraphicsBridge.drawLine(x1 + translateX, y1 + translateY, x2 + translateX, y2 + translateY, color)
+            NativeGraphicsBridge.drawLine(x2 + translateX, y2 + translateY, x3 + translateX, y3 + translateY, color)
+            NativeGraphicsBridge.drawLine(x3 + translateX, y3 + translateY, x1 + translateX, y1 + translateY, color)
+        }
+    }
+
+    /**
+     * javax.microedition.lcdui.Graphics.fillTriangle(IIIIII)V
+     */
+    fun fillTriangle(frame: ExecutionFrame) {
+        val y3 = frame.popInt()
+        val x3 = frame.popInt()
+        val y2 = frame.popInt()
+        val x2 = frame.popInt()
+        val y1 = frame.popInt()
+        val x1 = frame.popInt()
+        val thisGraphics = frame.pop() as? HeapObject
+        // Stub for now
+    }
+
+    private fun drawLineToBuffer(pixels: IntArray, imgW: Int, imgH: Int, x1: Int, y1: Int, x2: Int, y2: Int, color: Int) {
+        // Simple Bresenham's line algorithm
+        var cx = x1
+        var cy = y1
+        val dx = kotlin.math.abs(x2 - x1)
+        val dy = kotlin.math.abs(y2 - y1)
+        val sx = if (x1 < x2) 1 else -1
+        val sy = if (y1 < y2) 1 else -1
+        var err = dx - dy
+
+        while (true) {
+            if (cx in 0 until imgW && cy in 0 until imgH) {
+                pixels[cy * imgW + cx] = color
+            }
+            if (cx == x2 && cy == y2) break
+            val e2 = 2 * err
+            if (e2 > -dy) {
+                err -= dy
+                cx += sx
+            }
+            if (e2 < dx) {
+                err += dx
+                cy += sy
+            }
+        }
     }
 
     private fun drawRectToBuffer(pixels: IntArray, imgW: Int, imgH: Int, x: Int, y: Int, w: Int, h: Int, color: Int) {
@@ -314,6 +555,38 @@ object Graphics {
         NativeGraphicsBridge.setClip(x + translateX, y + translateY, width, height)
     }
 
+    /**
+     * javax.microedition.lcdui.Graphics.clipRect(IIII)V
+     */
+    fun clipRect(frame: ExecutionFrame) {
+        val h = frame.popInt()
+        val w = frame.popInt()
+        val y = frame.popInt()
+        val x = frame.popInt()
+        val thisGraphics = frame.pop() as? HeapObject
+
+        val translateX = thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0
+        val translateY = thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0
+
+        val oldX = thisGraphics?.instanceFields?.get("clipX:I") as? Int ?: 0
+        val oldY = thisGraphics?.instanceFields?.get("clipY:I") as? Int ?: 0
+        val oldW = thisGraphics?.instanceFields?.get("clipW:I") as? Int ?: 240
+        val oldH = thisGraphics?.instanceFields?.get("clipH:I") as? Int ?: 320
+
+        // Intersection
+        val newX = kotlin.math.max(oldX, x)
+        val newY = kotlin.math.max(oldY, y)
+        val newW = kotlin.math.min(oldX + oldW, x + w) - newX
+        val newH = kotlin.math.min(oldY + oldH, y + h) - newY
+
+        thisGraphics?.instanceFields?.put("clipX:I", newX)
+        thisGraphics?.instanceFields?.put("clipY:I", newY)
+        thisGraphics?.instanceFields?.put("clipW:I", if (newW < 0) 0 else newW)
+        thisGraphics?.instanceFields?.put("clipH:I", if (newH < 0) 0 else newH)
+
+        NativeGraphicsBridge.setClip(newX + translateX, newY + translateY, newW, newH)
+    }
+
     fun setFont(frame: ExecutionFrame) {
         val font = frame.pop() as? HeapObject
         val thisGraphics = frame.pop() as? HeapObject
@@ -325,6 +598,67 @@ object Graphics {
         val font = thisGraphics?.instanceFields?.get("font:Ljavax/microedition/lcdui/Font;") as? HeapObject
             ?: HeapObject("javax/microedition/lcdui/Font")
         frame.push(font)
+    }
+
+    fun getColor(frame: ExecutionFrame) {
+        val thisGraphics = frame.pop() as? HeapObject
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0xFF000000.toInt()
+        frame.push(color and 0xFFFFFF)
+    }
+
+    fun getRedComponent(frame: ExecutionFrame) {
+        val thisGraphics = frame.pop() as? HeapObject
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0
+        frame.push((color shr 16) and 0xFF)
+    }
+
+    fun getGreenComponent(frame: ExecutionFrame) {
+        val thisGraphics = frame.pop() as? HeapObject
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0
+        frame.push((color shr 8) and 0xFF)
+    }
+
+    fun getBlueComponent(frame: ExecutionFrame) {
+        val thisGraphics = frame.pop() as? HeapObject
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0
+        frame.push(color and 0xFF)
+    }
+
+    fun getGrayScale(frame: ExecutionFrame) {
+        val thisGraphics = frame.pop() as? HeapObject
+        val color = thisGraphics?.instanceFields?.get("color:I") as? Int ?: 0
+        val r = (color shr 16) and 0xFF
+        val g = (color shr 8) and 0xFF
+        val b = color and 0xFF
+        frame.push((r + g + b) / 3)
+    }
+
+    fun setGrayScale(frame: ExecutionFrame) {
+        val value = frame.popInt() and 0xFF
+        val thisGraphics = frame.pop() as? HeapObject
+        val packed = (0xFF shl 24) or (value shl 16) or (value shl 8) or value
+        thisGraphics?.instanceFields?.put("color:I", packed)
+    }
+
+    fun getTranslateX(frame: ExecutionFrame) {
+        val thisGraphics = frame.pop() as? HeapObject
+        frame.push(thisGraphics?.instanceFields?.get("translateX:I") as? Int ?: 0)
+    }
+
+    fun getTranslateY(frame: ExecutionFrame) {
+        val thisGraphics = frame.pop() as? HeapObject
+        frame.push(thisGraphics?.instanceFields?.get("translateY:I") as? Int ?: 0)
+    }
+
+    fun getStrokeStyle(frame: ExecutionFrame) {
+        val thisGraphics = frame.pop() as? HeapObject
+        frame.push(thisGraphics?.instanceFields?.get("strokeStyle:I") as? Int ?: SOLID)
+    }
+
+    fun setStrokeStyle(frame: ExecutionFrame) {
+        val style = frame.popInt()
+        val thisGraphics = frame.pop() as? HeapObject
+        thisGraphics?.instanceFields?.put("strokeStyle:I", style)
     }
 
     fun getClipX(frame: ExecutionFrame) {
@@ -398,6 +732,68 @@ object Graphics {
             NativeGraphicsBridge.drawImage(subPixels, width, height, destX, destY, anchor)
         }
         println("[J2ME Graphics] drawRegion(srcX=$srcX, srcY=$srcY, w=$width, h=$height, destX=$destX, destY=$destY, anchor=$anchor)")
+    }
+
+    /**
+     * javax.microedition.lcdui.Graphics.drawRGB([IIIIIIIZ)V
+     */
+    fun drawRGB(frame: ExecutionFrame) {
+        val processAlpha = frame.popInt() != 0
+        val height = frame.popInt()
+        val width = frame.popInt()
+        val y = frame.popInt()
+        val x = frame.popInt()
+        val scanlength = frame.popInt()
+        val offset = frame.popInt()
+        val rgbData = frame.pop() as? IntArray ?: IntArray(0)
+        val thisGraphics = frame.pop() as? HeapObject
+
+        if (thisGraphics == null) return
+        val translateX = thisGraphics.instanceFields["translateX:I"] as? Int ?: 0
+        val translateY = thisGraphics.instanceFields["translateY:I"] as? Int ?: 0
+
+        val targetImage = thisGraphics.instanceFields["_targetImage"] as? HeapObject
+        if (targetImage != null) {
+            val destPixels = targetImage.instanceFields["rgb:[I"] as? IntArray
+            val destW = targetImage.instanceFields["width:I"] as? Int ?: 0
+            val destH = targetImage.instanceFields["height:I"] as? Int ?: 0
+            if (destPixels != null) {
+                drawRGBToBuffer(rgbData, offset, scanlength, x + translateX, y + translateY, width, height, processAlpha, destPixels, destW, destH)
+            }
+        } else {
+            // Screen path: create a slice of pixels and draw
+            val subPixels = IntArray(width * height)
+            for (iy in 0 until height) {
+                for (ix in 0 until width) {
+                    val srcIdx = offset + iy * scanlength + ix
+                    if (srcIdx in rgbData.indices) {
+                        var pixel = rgbData[srcIdx]
+                        if (!processAlpha) pixel = pixel or 0xFF000000.toInt()
+                        subPixels[iy * width + ix] = pixel
+                    }
+                }
+            }
+            NativeGraphicsBridge.drawImage(subPixels, width, height, x + translateX, y + translateY, 20) // 20 = TOP | LEFT
+        }
+    }
+
+    private fun drawRGBToBuffer(src: IntArray, offset: Int, scan: Int, dx: Int, dy: Int, w: Int, h: Int, alpha: Boolean, dest: IntArray, dw: Int, dh: Int) {
+        for (iy in 0 until h) {
+            val dyy = dy + iy
+            if (dyy < 0 || dyy >= dh) continue
+            for (ix in 0 until w) {
+                val dxx = dx + ix
+                if (dxx < 0 || dxx >= dw) continue
+                val srcIdx = offset + iy * scan + ix
+                if (srcIdx in src.indices) {
+                    var pixel = src[srcIdx]
+                    if (!alpha) pixel = pixel or 0xFF000000.toInt()
+                    if (((pixel shr 24) and 0xFF) > 0) {
+                        dest[dyy * dw + dxx] = pixel
+                    }
+                }
+            }
+        }
     }
 
     private fun drawRegionToBuffer(src: IntArray, sw: Int, sh: Int, sx: Int, sy: Int, w: Int, h: Int, 

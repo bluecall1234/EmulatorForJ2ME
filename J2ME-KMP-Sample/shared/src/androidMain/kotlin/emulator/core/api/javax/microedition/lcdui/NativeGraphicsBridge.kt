@@ -27,6 +27,10 @@ internal object NativeGraphicsBridgeJni {
     external fun nativeSetClip(x: Int, y: Int, w: Int, h: Int)
     external fun nativeDrawImage(imageRgb: IntArray, imgW: Int, imgH: Int, x: Int, y: Int, anchor: Int)
     external fun nativeDrawString(text: String, x: Int, y: Int, color: Int)
+    external fun nativeDrawLine(x1: Int, y1: Int, x2: Int, y2: Int, r: Int, g: Int, b: Int, a: Int)
+    external fun nativeDrawRect(x: Int, y: Int, w: Int, h: Int, r: Int, g: Int, b: Int, a: Int)
+    external fun nativeDrawArc(x: Int, y: Int, w: Int, h: Int, start: Int, angle: Int, r: Int, g: Int, b: Int, a: Int, fill: Boolean)
+    external fun nativeDrawRoundRect(x: Int, y: Int, w: Int, h: Int, aw: Int, ah: Int, r: Int, g: Int, b: Int, a: Int, fill: Boolean)
 }
 
 actual object NativeGraphicsBridge {
@@ -74,6 +78,38 @@ actual object NativeGraphicsBridge {
     actual fun drawImage(imageRgb: IntArray, imgW: Int, imgH: Int, x: Int, y: Int, anchor: Int) {
         println("[JNI] drawImage() called for ${imgW}x${imgH} at ($x, $y)")
         NativeGraphicsBridgeJni.nativeDrawImage(imageRgb, imgW, imgH, x, y, anchor)
+    }
+
+    actual fun drawLine(x1: Int, y1: Int, x2: Int, y2: Int, color: Int) {
+        val a = (color shr 24) and 0xFF
+        val r = (color shr 16) and 0xFF
+        val g = (color shr 8) and 0xFF
+        val b = color and 0xFF
+        NativeGraphicsBridgeJni.nativeDrawLine(x1, y1, x2, y2, r, g, b, a)
+    }
+
+    actual fun drawRect(x: Int, y: Int, w: Int, h: Int, color: Int) {
+        val a = (color shr 24) and 0xFF
+        val r = (color shr 16) and 0xFF
+        val g = (color shr 8) and 0xFF
+        val b = color and 0xFF
+        NativeGraphicsBridgeJni.nativeDrawRect(x, y, w, h, r, g, b, a)
+    }
+
+    actual fun drawArc(x: Int, y: Int, w: Int, h: Int, startAngle: Int, arcAngle: Int, color: Int, fill: Boolean) {
+        val a = (color shr 24) and 0xFF
+        val r = (color shr 16) and 0xFF
+        val g = (color shr 8) and 0xFF
+        val b = color and 0xFF
+        NativeGraphicsBridgeJni.nativeDrawArc(x, y, w, h, startAngle, arcAngle, r, g, b, a, fill)
+    }
+
+    actual fun drawRoundRect(x: Int, y: Int, w: Int, h: Int, arcW: Int, arcH: Int, color: Int, fill: Boolean) {
+        val a = (color shr 24) and 0xFF
+        val r = (color shr 16) and 0xFF
+        val g = (color shr 8) and 0xFF
+        val b = color and 0xFF
+        NativeGraphicsBridgeJni.nativeDrawRoundRect(x, y, w, h, arcW, arcH, r, g, b, a, fill)
     }
 
     actual fun drawString(text: String, x: Int, y: Int, anchor: Int, color: Int) {

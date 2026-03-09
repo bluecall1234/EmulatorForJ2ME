@@ -229,6 +229,100 @@ Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDr
 }
 
 // ============================================================
+// nativeDrawLine
+// ============================================================
+extern "C" JNIEXPORT void JNICALL
+Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDrawLine(
+    JNIEnv *env, jobject /* this */, jint x1, jint y1, jint x2, jint y2, jint r,
+    jint g, jint b, jint a) {
+
+  if (!gInitialized || gFramebuffer == nullptr)
+    return;
+
+  uint32_t color = ((uint32_t)(a & 0xFF) << 24) | ((uint32_t)(r & 0xFF) << 16) |
+                   ((uint32_t)(g & 0xFF) << 8) | ((uint32_t)(b & 0xFF));
+
+  int dx = abs(x2 - x1);
+  int dy = abs(y2 - y1);
+  int sx = (x1 < x2) ? 1 : -1;
+  int sy = (y1 < y2) ? 1 : -1;
+  int err = dx - dy;
+
+  while (true) {
+    if (x1 >= 0 && x1 < gWidth && y1 >= 0 && y1 < gHeight) {
+      gFramebuffer[y1 * gWidth + x1] = color;
+    }
+    if (x1 == x2 && y1 == y2)
+      break;
+    int e2 = 2 * err;
+    if (e2 > -dy) {
+      err -= dy;
+      x1 += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      y1 += sy;
+    }
+  }
+}
+
+// ============================================================
+// nativeDrawRect
+// ============================================================
+extern "C" JNIEXPORT void JNICALL
+Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDrawRect(
+    JNIEnv *env, jobject /* this */, jint x, jint y, jint w, jint h, jint r,
+    jint g, jint b, jint a) {
+
+  if (!gInitialized || gFramebuffer == nullptr)
+    return;
+
+  // Utilize nativeDrawLine for the 4 sides
+  Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDrawLine(
+      env, nullptr, x, y, x + w, y, r, g, b, a);
+  Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDrawLine(
+      env, nullptr, x, y + h, x + w, y + h, r, g, b, a);
+  Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDrawLine(
+      env, nullptr, x, y, x, y + h, r, g, b, a);
+  Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDrawLine(
+      env, nullptr, x + w, y, x + w, y + h, r, g, b, a);
+}
+
+// ============================================================
+// nativeDrawArc (Stub)
+// ============================================================
+extern "C" JNIEXPORT void JNICALL
+Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDrawArc(
+    JNIEnv *env, jobject /* this */, jint x, jint y, jint w, jint h, jint start,
+    jint angle, jint r, jint g, jint b, jint a, jboolean fill) {
+  LOGD("nativeDrawArc (stub) called");
+  if (fill) {
+    Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeFillRect(
+        env, nullptr, x, y, w, h, r, g, b, a);
+  } else {
+    Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDrawRect(
+        env, nullptr, x, y, w, h, r, g, b, a);
+  }
+}
+
+// ============================================================
+// nativeDrawRoundRect (Stub)
+// ============================================================
+extern "C" JNIEXPORT void JNICALL
+Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDrawRoundRect(
+    JNIEnv *env, jobject /* this */, jint x, jint y, jint w, jint h, jint aw,
+    jint ah, jint r, jint g, jint b, jint a, jboolean fill) {
+  LOGD("nativeDrawRoundRect (stub) called");
+  if (fill) {
+    Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeFillRect(
+        env, nullptr, x, y, w, h, r, g, b, a);
+  } else {
+    Java_emulator_core_api_javax_microedition_lcdui_NativeGraphicsBridgeJni_nativeDrawRect(
+        env, nullptr, x, y, w, h, r, g, b, a);
+  }
+}
+
+// ============================================================
 // nativeDrawString
 // ============================================================
 extern "C" JNIEXPORT void JNICALL

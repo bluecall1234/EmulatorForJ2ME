@@ -49,6 +49,26 @@ expect object NativeGraphicsBridge {
     fun measureString(text: String): Int
 
     /**
+     * Draw line on screen.
+     */
+    fun drawLine(x1: Int, y1: Int, x2: Int, y2: Int, color: Int)
+
+    /**
+     * Draw rectangle outline on screen.
+     */
+    fun drawRect(x: Int, y: Int, w: Int, h: Int, color: Int)
+
+    /**
+     * Draw/Fill Arc on screen.
+     */
+    fun drawArc(x: Int, y: Int, w: Int, h: Int, startAngle: Int, arcAngle: Int, color: Int, fill: Boolean)
+
+    /**
+     * Draw/Fill RoundRect on screen.
+     */
+    fun drawRoundRect(x: Int, y: Int, w: Int, h: Int, arcW: Int, arcH: Int, color: Int, fill: Boolean)
+
+    /**
      * Draw text into a raw ARGB pixel buffer.
      */
     fun drawTextToBuffer(pixels: IntArray, width: Int, height: Int, text: String, x: Int, y: Int, anchor: Int, color: Int)

@@ -487,6 +487,78 @@ object NativeMethodBridge {
         nativeMethods["javax/microedition/lcdui/Graphics.drawChars:([CIIIII)V"] = { frame ->
             emulator.core.api.javax.microedition.lcdui.Graphics.drawChars(frame)
         }
+
+        // New MIDP 2.0 / 1.0 methods
+        nativeMethods["javax/microedition/lcdui/Graphics.getColor:()I"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.getColor(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.getRedComponent:()I"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.getRedComponent(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.getGreenComponent:()I"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.getGreenComponent(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.getBlueComponent:()I"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.getBlueComponent(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.getGrayScale:()I"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.getGrayScale(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.setGrayScale:(I)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.setGrayScale(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.getTranslateX:()I"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.getTranslateX(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.getTranslateY:()I"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.getTranslateY(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.getStrokeStyle:()I"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.getStrokeStyle(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.setStrokeStyle:(I)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.setStrokeStyle(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.drawRect:(IIII)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.drawRect(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.drawLine:(IIII)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.drawLine(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.clipRect:(IIII)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.clipRect(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.drawRGB:([IIIIIIIZ)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.drawRGB(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.drawArc:(IIIIII)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.drawArc(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.fillArc:(IIIIII)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.fillArc(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.drawRoundRect:(IIIIII)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.drawRoundRect(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.fillRoundRect:(IIIIII)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.fillRoundRect(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.drawTriangle:(IIIIII)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.drawTriangle(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.fillTriangle:(IIIIII)V"] = { frame ->
+            emulator.core.api.javax.microedition.lcdui.Graphics.fillTriangle(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.copyArea:(IIIIIII)V"] = { frame ->
+            // Stub for copyArea
+            for (i in 0 until 7) frame.popInt()
+            frame.pop() // this
+        }
+        nativeMethods["javax/microedition/lcdui/Graphics.getDisplayColor:(I)I"] = { frame ->
+            val color = frame.popInt()
+            frame.pop() // this
+            frame.push(color)
+        }
     }
 
     private fun registerJavaxMicroeditionLcduiFont() {
