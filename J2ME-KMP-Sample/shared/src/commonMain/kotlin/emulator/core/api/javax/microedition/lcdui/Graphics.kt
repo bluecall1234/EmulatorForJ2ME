@@ -398,8 +398,11 @@ object Graphics {
         return when (obj) {
             is String -> obj
             is HeapObject -> {
-                val chars = obj.instanceFields["value:[C"] as? CharArray
-                chars?.concatToString() ?: ""
+                if (obj.className == "java/lang/String") {
+                    obj.instanceFields["value"] as? String ?: ""
+                } else {
+                    ""
+                }
             }
             else -> ""
         }

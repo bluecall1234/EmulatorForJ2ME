@@ -17,6 +17,9 @@ interface BytecodeInterpreter {
     // Set the path of the JAR being executed to allow dynamic class loading
     var currentJarPath: String
     
+    // The active MIDlet instance
+    var activeMIDlet: Any?
+    
     // Load a class from a byte array (read from a .class file inside a JAR)
     fun loadClass(className: String, bytecode: ByteArray)
     
@@ -151,6 +154,7 @@ interface BytecodeInterpreter {
 class SimpleKMPInterpreter : BytecodeInterpreter {
     
     override var currentJarPath: String = ""
+    override var activeMIDlet: Any? = null
     private val loadedClasses = mutableMapOf<String, JavaClassFile>()
     private val initializedClasses = mutableSetOf<String>()
 

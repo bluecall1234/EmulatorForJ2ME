@@ -1,0 +1,3 @@
+./gradlew :androidApp:installDebug; if ($?) { adb shell am start -n com.example.j2me.android/.MainActivity }
+
+ adb shell cat /storage/emulated/0/Android/data/com.example.j2me.android/files/emulator_log.txt > "D:\WebTrainning\Antigravity\EmulatorForJ2ME\J2ME-KMP-Sample\debug_log\emulator_log_post_fix.txt"

@@ -9,6 +9,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import emulator.core.api.javax.microedition.lcdui.NativeGraphicsBridge
+import emulator.core.api.javax.microedition.lcdui.Graphics
+import emulator.core.api.javax.microedition.lcdui.Font
+import emulator.core.api.javax.microedition.lcdui.Canvas
+import emulator.core.api.javax.microedition.lcdui.Displayable
+import emulator.core.api.javax.microedition.lcdui.Display
+import emulator.core.api.java.io.InputStream
+import emulator.core.api.java.io.DataInputStream
 
 /**
  * The Native Method Bridge acts as a router between the Bytecode Interpreter
@@ -148,7 +155,11 @@ object NativeMethodBridge {
                 "microedition.smartcardslots" -> "0"
                 "microedition.commports" -> ""
                 "microedition.hostname" -> "localhost"
-                else -> null
+                "microedition.device" -> "Nokia6300"
+                "platform" -> "Nokia6300"
+                "IMEI" -> "350000000000000"
+                "getMaxAvailableRam" -> "33554432" // 32MB
+                else -> "" // Return empty string instead of null for stability
             }
             frame.push(value)
         }
@@ -329,27 +340,40 @@ object NativeMethodBridge {
 
     private fun registerJavaxMicroeditionLcduiDisplay() {
         nativeMethods["javax/microedition/lcdui/Display.getDisplay:(Ljavax/microedition/midlet/MIDlet;)Ljavax/microedition/lcdui/Display;"] = { frame ->
-            emulator.core.api.javax.microedition.lcdui.Display.getDisplay(frame)
+            Display.getDisplay(frame)
         }
         nativeMethods["javax/microedition/lcdui/Display.setCurrent:(Ljavax/microedition/lcdui/Displayable;)V"] = { frame ->
-            emulator.core.api.javax.microedition.lcdui.Display.setCurrent(frame)
+            Display.setCurrent(frame)
         }
         nativeMethods["javax/microedition/lcdui/Display.getCurrent:()Ljavax/microedition/lcdui/Displayable;"] = { frame ->
-            frame.pop() // this
-            frame.push(emulator.core.api.javax.microedition.lcdui.Display.activeDisplayable)
-        }
-        nativeMethods["javax/microedition/lcdui/Display.vibrate:(I)Z"] = { frame ->
-            frame.popInt() // duration
-            frame.pop() // this
-            frame.push(1) // Succesfull
+            Display.getCurrent(frame)
         }
         nativeMethods["javax/microedition/lcdui/Display.isColor:()Z"] = { frame ->
-            frame.pop() // this
-            frame.push(1)
+            Display.isColor(frame)
         }
         nativeMethods["javax/microedition/lcdui/Display.numColors:()I"] = { frame ->
-            frame.pop() // this
-            frame.push(65536)
+            Display.numColors(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Display.numAlphaLevels:()I"] = { frame ->
+            Display.numAlphaLevels(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Display.getColor:(I)I"] = { frame ->
+            Display.getColor(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Display.vibrate:(I)Z"] = { frame ->
+            Display.vibrate(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Display.flashBacklight:(I)Z"] = { frame ->
+            Display.flashBacklight(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Display.getBestImageHeight:(I)I"] = { frame ->
+            Display.getBestImageHeight(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Display.getBestImageWidth:(I)I"] = { frame ->
+            Display.getBestImageWidth(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Display.callSerially:(Ljava/lang/Runnable;)V"] = { frame ->
+            Display.callSerially(frame)
         }
     }
 
@@ -407,24 +431,43 @@ object NativeMethodBridge {
 
     private fun registerJavaxMicroeditionLcduiCanvas() {
         nativeMethods["javax/microedition/lcdui/Canvas.repaint:()V"] = { frame ->
-            println("[NativeBridge] Calling Canvas.repaint()")
-            emulator.core.api.javax.microedition.lcdui.Canvas.repaint(frame)
+            Canvas.repaint(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Canvas.repaint:(IIII)V"] = { frame ->
+            Canvas.repaintRegion(frame)
         }
         nativeMethods["javax/microedition/lcdui/Canvas.serviceRepaints:()V"] = { frame ->
             frame.pop() // this
         }
         nativeMethods["javax/microedition/lcdui/Canvas.setFullScreenMode:(Z)V"] = { frame ->
-            println("[NativeBridge] Calling Canvas.setFullScreenMode()")
-            emulator.core.api.javax.microedition.lcdui.Canvas.setFullScreenMode(frame)
-            println("[NativeBridge] Returned from Canvas.setFullScreenMode()")
+            Canvas.setFullScreenMode(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Canvas.getGameAction:(I)I"] = { frame ->
+            Canvas.getGameAction(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Canvas.getKeyCode:(I)I"] = { frame ->
+            Canvas.getKeyCode(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Canvas.getKeyName:(I)Ljava/lang/String;"] = { frame ->
+            Canvas.getKeyName(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Canvas.hasPointerEvents:()Z"] = { frame ->
+            Canvas.hasPointerEvents(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Canvas.hasPointerMotionEvents:()Z"] = { frame ->
+            Canvas.hasPointerMotionEvents(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Canvas.hasRepeatEvents:()Z"] = { frame ->
+            Canvas.hasRepeatEvents(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Canvas.isDoubleBuffered:()Z"] = { frame ->
+            Canvas.isDoubleBuffered(frame)
         }
         nativeMethods["javax/microedition/lcdui/Canvas.getWidth:()I"] = { frame ->
-            frame.pop() // this
-            frame.push(240)
+            Canvas.getWidth(frame)
         }
         nativeMethods["javax/microedition/lcdui/Canvas.getHeight:()I"] = { frame ->
-            frame.pop() // this
-            frame.push(320)
+            Canvas.getHeight(frame)
         }
     }
 
@@ -564,72 +607,70 @@ object NativeMethodBridge {
     private fun registerJavaxMicroeditionLcduiFont() {
         // static getFont(int face, int style, int size)
         nativeMethods["javax/microedition/lcdui/Font.getFont:(III)Ljavax/microedition/lcdui/Font;"] = { frame ->
-            val size = frame.popInt()
-            val style = frame.popInt()
-            val face = frame.popInt()
-            val fontObj = HeapObject("javax/microedition/lcdui/Font")
-            fontObj.instanceFields["style:I"] = style
-            fontObj.instanceFields["face:I"] = face
-            fontObj.instanceFields["size:I"] = size
-            frame.push(fontObj)
+            Font.getFont(frame)
         }
         nativeMethods["javax/microedition/lcdui/Font.getDefaultFont:()Ljavax/microedition/lcdui/Font;"] = { frame ->
-            frame.push(HeapObject("javax/microedition/lcdui/Font"))
+            Font.getDefaultFont(frame)
         }
         nativeMethods["javax/microedition/lcdui/Font.getHeight:()I"] = { frame ->
-            frame.pop() // this
-            frame.push(16) // Stub height
+            Font.getHeight(frame)
         }
         nativeMethods["javax/microedition/lcdui/Font.stringWidth:(Ljava/lang/String;)I"] = { frame ->
-            val strObj = frame.pop()
-            val text = when (strObj) {
-                is String -> strObj
-                is HeapObject -> {
-                    val chars = strObj.instanceFields["value:[C"] as? CharArray
-                    chars?.concatToString() ?: ""
-                }
-                else -> ""
-            }
-            frame.pop() // this
-            frame.push(emulator.core.api.javax.microedition.lcdui.NativeGraphicsBridge.measureString(text))
+            Font.stringWidth(frame)
         }
-        
-        // javax/microedition/lcdui/Font.substringWidth:(Ljava/lang/String;II)I
         nativeMethods["javax/microedition/lcdui/Font.substringWidth:(Ljava/lang/String;II)I"] = { frame ->
-            val len = frame.popInt()
-            val offset = frame.popInt()
-            val strObj = frame.pop()
-            val fullText = when (strObj) {
-                is String -> strObj
-                is HeapObject -> {
-                    val chars = strObj.instanceFields["value:[C"] as? CharArray
-                    chars?.concatToString() ?: ""
-                }
-                else -> ""
-            }
-            val text = try { fullText.substring(offset, offset + len) } catch(e: Exception) { "" }
-            frame.pop() // this
-            frame.push(emulator.core.api.javax.microedition.lcdui.NativeGraphicsBridge.measureString(text))
+            Font.substringWidth(frame)
         }
-
-        // javax/microedition/lcdui/Font.charsWidth:([CII)I
         nativeMethods["javax/microedition/lcdui/Font.charsWidth:([CII)I"] = { frame ->
-            val len = frame.popInt()
-            val offset = frame.popInt()
-            val chars = frame.pop() as? CharArray ?: CharArray(0)
-            val text = try { chars.concatToString(offset, offset + len) } catch(e: Exception) { "" }
-            frame.pop() // this
-            frame.push(emulator.core.api.javax.microedition.lcdui.NativeGraphicsBridge.measureString(text))
+            Font.charsWidth(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Font.charWidth:(C)I"] = { frame ->
+            Font.charWidth(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Font.getFace:()I"] = { frame ->
+            Font.getFace(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Font.getStyle:()I"] = { frame ->
+            Font.getStyle(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Font.getSize:()I"] = { frame ->
+            Font.getSize(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Font.isBold:()Z"] = { frame ->
+            Font.isBold(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Font.isItalic:()Z"] = { frame ->
+            Font.isItalic(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Font.isPlain:()Z"] = { frame ->
+            Font.isPlain(frame)
+        }
+        nativeMethods["javax/microedition/lcdui/Font.isUnderlined:()Z"] = { frame ->
+            Font.isUnderlined(frame)
         }
     }
 
     private fun registerJavaLangClass() {
         // java/lang/Object.getClass:()Ljava/lang/Class;
         nativeMethods["java/lang/Object.getClass:()Ljava/lang/Class;"] = { frame ->
-            val obj = frame.pop() as? HeapObject
+            val obj = frame.pop()
             if (obj != null) {
+                val className = when (obj) {
+                    is HeapObject -> obj.className
+                    is String -> "java/lang/String"
+                    is ByteArray -> "[B"
+                    is IntArray -> "[I"
+                    is ShortArray -> "[S"
+                    is LongArray -> "[J"
+                    is FloatArray -> "[F"
+                    is DoubleArray -> "[D"
+                    is BooleanArray -> "[Z"
+                    is CharArray -> "[C"
+                    is Array<*> -> "[Ljava/lang/Object;"
+                    else -> obj::class.simpleName ?: "java/lang/Object"
+                }
                 val classObj = HeapObject("java/lang/Class")
-                classObj.instanceFields["_targetClassName"] = obj.className
+                classObj.instanceFields["_targetClassName"] = className
                 frame.push(classObj)
             } else {
                 frame.push(null)
@@ -1116,167 +1157,83 @@ object NativeMethodBridge {
             val b = frame.popInt() != 0
             frame.push(b.toString())
         }
+
+        // java/lang/String.getBytes:()[B
+        nativeMethods["java/lang/String.getBytes:()[B"] = { frame ->
+            val thisStr = getString(frame.pop())
+            // J2ME default is often ISO-8859-1 or UTF-8. 
+            // We'll use UTF-8 as it's more universal in modern KMP.
+            frame.push(thisStr.encodeToByteArray())
+        }
+
+        // java/lang/String.getBytes:(Ljava/lang/String;)[B
+        nativeMethods["java/lang/String.getBytes:(Ljava/lang/String;)[B"] = { frame ->
+            val enc = getString(frame.pop())
+            val thisStr = getString(frame.pop())
+            try {
+                // In KMP, we might need to handle specific encodings if they differ from UTF-8
+                // For now, let's treat everything as UTF-8 or fallback to basic encoding.
+                frame.push(thisStr.encodeToByteArray())
+            } catch (e: Exception) {
+                throw RuntimeException("java/io/UnsupportedEncodingException")
+            }
+        }
     }
 
     private fun registerJavaIoDataInputStream() {
         // java/io/DataInputStream.<init>:(Ljava/io/InputStream;)V
         nativeMethods["java/io/DataInputStream.<init>:(Ljava/io/InputStream;)V"] = { frame ->
-            val inputStream = frame.pop() as? HeapObject
-            val thisObj = frame.pop() as? HeapObject
-            thisObj?.instanceFields?.set("_stream", inputStream)
+            DataInputStream.init(frame)
         }
 
         // java/io/DataInputStream.readUnsignedShort:()I
         nativeMethods["java/io/DataInputStream.readUnsignedShort:()I"] = { frame ->
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject
-            
-            if (inputStream != null) {
-                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
-                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
-                
-                if (pos + 1 < data.size) {
-                    val b1 = data[pos].toInt() and 0xFF
-                    val b2 = data[pos + 1].toInt() and 0xFF
-                    inputStream.instanceFields["_pos:I"] = pos + 2
-                    frame.push((b1 shl 8) or b2)
-                } else {
-                    throw RuntimeException("java/io/EOFException")
-                }
-            } else {
-                throw RuntimeException("java/io/EOFException")
-            }
+            DataInputStream.readUnsignedShort(frame)
         }
 
         // java/io/DataInputStream.readShort:()S
         nativeMethods["java/io/DataInputStream.readShort:()S"] = { frame ->
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject
-            if (inputStream != null) {
-                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
-                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
-                if (pos + 1 < data.size) {
-                    val b1 = data[pos].toInt()
-                    val b2 = data[pos + 1].toInt() and 0xFF
-                    inputStream.instanceFields["_pos:I"] = pos + 2
-                    frame.push(((b1 shl 8) or b2).toShort().toInt())
-                } else {
-                    throw RuntimeException("java/io/EOFException")
-                }
-            } else {
-                frame.push(0)
-            }
+            DataInputStream.readShort(frame)
         }
 
         // java/io/DataInputStream.readInt:()I
         nativeMethods["java/io/DataInputStream.readInt:()I"] = { frame ->
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject
-            if (inputStream != null) {
-                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
-                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
-                if (pos + 3 < data.size) {
-                    val b1 = data[pos].toInt() and 0xFF
-                    val b2 = data[pos + 1].toInt() and 0xFF
-                    val b3 = data[pos + 2].toInt() and 0xFF
-                    val b4 = data[pos + 3].toInt() and 0xFF
-                    inputStream.instanceFields["_pos:I"] = pos + 4
-                    frame.push((b1 shl 24) or (b2 shl 16) or (b3 shl 8) or b4)
-                } else {
-                    throw RuntimeException("java/io/EOFException")
-                }
-            } else {
-                frame.push(0)
-            }
+            DataInputStream.readInt(frame)
         }
 
         // java/io/DataInputStream.readByte:()B
         nativeMethods["java/io/DataInputStream.readByte:()B"] = { frame ->
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject
-            if (inputStream != null) {
-                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
-                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
-                if (pos < data.size) {
-                    val b = data[pos].toInt()
-                    inputStream.instanceFields["_pos:I"] = pos + 1
-                    frame.push(b)
-                    // println("[NativeBridge] readByte -> $b")
-                } else {
-                    // J2ME: throw EOFException
-                    throw RuntimeException("java/io/EOFException")
-                }
-            } else {
-                frame.push(0)
-            }
+            DataInputStream.readByte(frame)
         }
 
         // java/io/DataInputStream.readUnsignedByte:()I
         nativeMethods["java/io/DataInputStream.readUnsignedByte:()I"] = { frame ->
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject
-            if (inputStream != null) {
-                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
-                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
-                if (pos < data.size) {
-                    val b = data[pos].toInt() and 0xFF
-                    inputStream.instanceFields["_pos:I"] = pos + 1
-                    frame.push(b)
-                } else {
-                    throw RuntimeException("java/io/EOFException")
-                }
-            } else {
-                throw RuntimeException("java/io/EOFException")
-            }
+            DataInputStream.readUnsignedByte(frame)
+        }
+
+        // java/io/DataInputStream.readBoolean:()Z
+        nativeMethods["java/io/DataInputStream.readBoolean:()Z"] = { frame ->
+            DataInputStream.readBoolean(frame)
+        }
+
+        // java/io/DataInputStream.readChar:()C
+        nativeMethods["java/io/DataInputStream.readChar:()C"] = { frame ->
+            DataInputStream.readChar(frame)
         }
 
         // java/io/DataInputStream.readUTF:()Ljava/lang/String;
         nativeMethods["java/io/DataInputStream.readUTF:()Ljava/lang/String;"] = { frame ->
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject
-            
-            if (inputStream != null) {
-                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
-                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
-                
-                if (pos + 1 < data.size) {
-                    val len = ((data[pos].toInt() and 0xFF) shl 8) or (data[pos + 1].toInt() and 0xFF)
-                    pos += 2
-                    if (pos + len <= data.size) {
-                        val utf8 = data.decodeToString(pos, pos + len)
-                        inputStream.instanceFields["_pos:I"] = pos + len
-                        frame.push(utf8)
-                    } else {
-                        frame.push("")
-                    }
-                } else {
-                    frame.push("")
-                }
-            } else {
-                frame.push("")
-            }
+            DataInputStream.readUTF(frame)
         }
 
         // java/io/DataInputStream.skipBytes:(I)I
         nativeMethods["java/io/DataInputStream.skipBytes:(I)I"] = { frame ->
-            val n = frame.popInt()
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject
-            
-            if (inputStream != null) {
-                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
-                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
-                val skipped = minOf(n, data.size - pos)
-                inputStream.instanceFields["_pos:I"] = pos + skipped
-                frame.push(skipped)
-            } else {
-                frame.push(0)
-            }
+            DataInputStream.skipBytes(frame)
         }
 
         // java/io/DataInputStream.close:()V
         nativeMethods["java/io/DataInputStream.close:()V"] = { frame ->
-            frame.pop()
+            DataInputStream.close(frame)
         }
 
         // java/io/DataInputStream.markSupported:()Z
@@ -1293,82 +1250,32 @@ object NativeMethodBridge {
 
         // java/io/DataInputStream.readLong:()J
         nativeMethods["java/io/DataInputStream.readLong:()J"] = { frame ->
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject
-            if (inputStream != null) {
-                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
-                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
-                if (pos + 7 < data.size) {
-                    val b1 = data[pos].toLong() and 0xFF
-                    val b2 = data[pos + 1].toLong() and 0xFF
-                    val b3 = data[pos + 2].toLong() and 0xFF
-                    val b4 = data[pos + 3].toLong() and 0xFF
-                    val b5 = data[pos + 4].toLong() and 0xFF
-                    val b6 = data[pos + 5].toLong() and 0xFF
-                    val b7 = data[pos + 6].toLong() and 0xFF
-                    val b8 = data[pos + 7].toLong() and 0xFF
-                    inputStream.instanceFields["_pos:I"] = pos + 8
-                    val res = (b1 shl 56) or (b2 shl 48) or (b3 shl 40) or (b4 shl 32) or
-                              (b5 shl 24) or (b6 shl 16) or (b7 shl 8) or b8
-                    frame.push(res)
-                } else {
-                    throw RuntimeException("java/io/EOFException")
-                }
-            } else {
-                frame.push(0L)
-            }
+            DataInputStream.readLong(frame)
+        }
+
+        // java/io/DataInputStream.readFloat:()F
+        nativeMethods["java/io/DataInputStream.readFloat:()F"] = { frame ->
+            DataInputStream.readFloat(frame)
+        }
+
+        // java/io/DataInputStream.readDouble:()D
+        nativeMethods["java/io/DataInputStream.readDouble:()D"] = { frame ->
+            DataInputStream.readDouble(frame)
         }
 
         // java/io/DataInputStream.readFully:([B)V
         nativeMethods["java/io/DataInputStream.readFully:([B)V"] = { frame ->
-            val b = frame.pop() as? ByteArray
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject
-            
-            if (inputStream != null && b != null) {
-                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
-                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
-                val len = b.size
-                if (pos + len <= data.size) {
-                    data.copyInto(b, 0, pos, pos + len)
-                    inputStream.instanceFields["_pos:I"] = pos + len
-                } else {
-                    throw RuntimeException("java/io/EOFException")
-                }
-            }
+            DataInputStream.readFully(frame)
         }
         
         // java/io/DataInputStream.readFully:([BII)V
         nativeMethods["java/io/DataInputStream.readFully:([BII)V"] = { frame ->
-            val len = frame.popInt()
-            val off = frame.popInt()
-            val b = frame.pop() as? ByteArray
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject
-            
-            if (inputStream != null && b != null) {
-                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
-                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
-                if (pos + len <= data.size) {
-                    data.copyInto(b, off, pos, pos + len)
-                    inputStream.instanceFields["_pos:I"] = pos + len
-                } else {
-                    throw RuntimeException("java/io/EOFException")
-                }
-            }
+            DataInputStream.readFullyRegion(frame)
         }
 
         // java/io/DataInputStream.available:()I
         nativeMethods["java/io/DataInputStream.available:()I"] = { frame ->
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject
-            if (inputStream != null) {
-                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
-                val pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
-                frame.push(maxOf(0, data.size - pos))
-            } else {
-                frame.push(0)
-            }
+            DataInputStream.available(frame)
         }
     }
 
@@ -1416,124 +1323,47 @@ object NativeMethodBridge {
 
     private fun registerJavaIoInputStream() {
         println("[NativeBridge] Registering java/io/InputStream methods")
-        // java/io/InputStream.read:([BII)I
-        // Note: DataInputStream often inherits this or overrides it.
-        val readByteArray: (ExecutionFrame) -> Unit = { frame ->
-            val len = frame.popInt()
-            val offset = frame.popInt()
-            val b = frame.pop() as? ByteArray
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject ?: thisObj
-            
-            if (inputStream != null) {
-                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
-                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
-                if (pos >= data.size) {
-                    frame.push(-1) // EOF
-                } else {
-                    val count = minOf(len, data.size - pos)
-                    if (b != null) {
-                        data.copyInto(b, offset, pos, pos + count)
-                    }
-                    inputStream.instanceFields["_pos:I"] = pos + count
-                    frame.push(count)
-                }
-            } else {
-                frame.push(-1)
-            }
+
+        nativeMethods["java/io/InputStream.read:([BII)I"] = { frame ->
+            InputStream.readArrayRegion(frame)
         }
-        
-        nativeMethods["java/io/InputStream.read:([BII)I"] = readByteArray
-        nativeMethods["java/io/DataInputStream.read:([BII)I"] = readByteArray
+        nativeMethods["java/io/DataInputStream.read:([BII)I"] = { frame ->
+            InputStream.readArrayRegion(frame)
+        }
 
         // java/io/InputStream.read:([B)I
         nativeMethods["java/io/InputStream.read:([B)I"] = { frame ->
-            val b = frame.pop() as? ByteArray
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject ?: thisObj
-            
-            if (inputStream != null && b != null) {
-                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
-                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
-                if (pos >= data.size) {
-                    frame.push(-1) // EOF
-                } else {
-                    val count = minOf(b.size, data.size - pos)
-                    data.copyInto(b, 0, pos, pos + count)
-                    inputStream.instanceFields["_pos:I"] = pos + count
-                    frame.push(count)
-                }
-            } else {
-                frame.push(-1)
-            }
+            InputStream.readArray(frame)
         }
         
         // java/io/InputStream.read:()I
         nativeMethods["java/io/InputStream.read:()I"] = { frame ->
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject ?: thisObj
-            if (inputStream != null) {
-                val data = inputStream.instanceFields["_data:[B"] as? ByteArray ?: ByteArray(0)
-                var pos = inputStream.instanceFields["_pos:I"] as? Int ?: 0
-                if (pos < data.size) {
-                    val b = data[pos].toInt() and 0xFF
-                    inputStream.instanceFields["_pos:I"] = pos + 1
-                    frame.push(b)
-                }
-            } else {
-                frame.push(-1)
-            }
+            InputStream.read(frame)
         }
 
         // java/io/InputStream.close:()V
         nativeMethods["java/io/InputStream.close:()V"] = { frame ->
-            frame.pop()
+            InputStream.close(frame)
         }
 
         // java/io/InputStream.available:()I
         nativeMethods["java/io/InputStream.available:()I"] = { frame ->
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject ?: thisObj
-            val data = inputStream?.instanceFields?.get("_data:[B") as? ByteArray ?: ByteArray(0)
-            val pos = inputStream?.instanceFields?.get("_pos:I") as? Int ?: 0
-            frame.push(maxOf(0, data.size - pos))
+            InputStream.available(frame)
         }
 
         // java/io/InputStream.skip:(J)J
         nativeMethods["java/io/InputStream.skip:(J)J"] = { frame ->
-            val n = frame.popLong()
-            val thisObj = frame.pop() as? HeapObject
-            val inputStream = thisObj?.instanceFields?.get("_stream") as? HeapObject ?: thisObj
-            val data = inputStream?.instanceFields?.get("_data:[B") as? ByteArray ?: ByteArray(0)
-            val pos = inputStream?.instanceFields?.get("_pos:I") as? Int ?: 0
-            
-            val toSkip = minOf(n, (data.size - pos).toLong()).toInt()
-            inputStream?.instanceFields?.set("_pos:I", pos + toSkip)
-            frame.push(toSkip.toLong())
+            InputStream.skip(frame)
         }
 
         // java/io/ByteArrayInputStream.<init>:([B)V
         nativeMethods["java/io/ByteArrayInputStream.<init>:([B)V"] = { frame ->
-            val data = frame.pop() as? ByteArray ?: ByteArray(0)
-            val thisObj = frame.pop() as? HeapObject
-            thisObj?.instanceFields?.set("_data:[B", data)
-            thisObj?.instanceFields?.set("_pos:I", 0)
+            InputStream.initByteArray(frame)
         }
         
         // java/io/ByteArrayInputStream.<init>:([BII)V
         nativeMethods["java/io/ByteArrayInputStream.<init>:([BII)V"] = { frame ->
-            val len = frame.popInt()
-            val off = frame.popInt()
-            val data = frame.pop() as? ByteArray ?: ByteArray(0)
-            val thisObj = frame.pop() as? HeapObject
-            
-            val sliced = if (off >= 0 && off + len <= data.size) {
-                data.copyOfRange(off, off + len)
-            } else {
-                ByteArray(0)
-            }
-            thisObj?.instanceFields?.set("_data:[B", sliced)
-            thisObj?.instanceFields?.set("_pos:I", 0)
+            InputStream.initByteArrayRegion(frame)
         }
     }
 
@@ -1615,16 +1445,18 @@ object NativeMethodBridge {
 
         // javax/microedition/midlet/MIDlet.getAppProperty:(Ljava/lang/String;)Ljava/lang/String;
         nativeMethods["javax/microedition/midlet/MIDlet.getAppProperty:(Ljava/lang/String;)Ljava/lang/String;"] = { frame ->
-            val key = frame.pop() as? String ?: ""
-            frame.pop() // this
+            val key = frame.pop() as? String
+            val _midlet = frame.pop() // pop this to balance stack
             println("[NativeBridge] MIDlet.getAppProperty(\"$key\") called")
+            
             val valStr = when(key) {
                 "MIDlet-Name" -> "Bounce Tales"
                 "MIDlet-Vendor" -> "Nokia"
                 "MIDlet-Version" -> "2.0.17"
                 "MicroEdition-Configuration" -> "CLDC-1.1"
                 "MicroEdition-Profile" -> "MIDP-2.0"
-                else -> null
+                "platform" -> "Nokia 6300"
+                else -> "" // Return empty string instead of null to prevent NPE in obfuscated game logic
             }
             frame.push(valStr)
         }
@@ -1636,16 +1468,46 @@ object NativeMethodBridge {
             frame.pop() // this
         }
 
+        nativeMethods["javax/microedition/lcdui/Displayable.addCommand:(Ljavax/microedition/lcdui/Command;)V"] = { frame ->
+            Displayable.addCommand(frame)
+        }
+
+        nativeMethods["javax/microedition/lcdui/Displayable.removeCommand:(Ljavax/microedition/lcdui/Command;)V"] = { frame ->
+            Displayable.removeCommand(frame)
+        }
+
+        nativeMethods["javax/microedition/lcdui/Displayable.setCommandListener:(Ljavax/microedition/lcdui/CommandListener;)V"] = { frame ->
+            Displayable.setCommandListener(frame)
+        }
+
+        nativeMethods["javax/microedition/lcdui/Displayable.setTitle:(Ljava/lang/String;)V"] = { frame ->
+            Displayable.setTitle(frame)
+        }
+
+        nativeMethods["javax/microedition/lcdui/Displayable.getTitle:()Ljava/lang/String;"] = { frame ->
+            Displayable.getTitle(frame)
+        }
+
         // javax/microedition/lcdui/Displayable.getWidth:()I
         nativeMethods["javax/microedition/lcdui/Displayable.getWidth:()I"] = { frame ->
-            frame.pop() // this
-            frame.push(240) // Default width
+            Displayable.getWidth(frame)
         }
 
         // javax/microedition/lcdui/Displayable.getHeight:()I
         nativeMethods["javax/microedition/lcdui/Displayable.getHeight:()I"] = { frame ->
-            frame.pop() // this
-            frame.push(320) // Default height
+            Displayable.getHeight(frame)
+        }
+
+        nativeMethods["javax/microedition/lcdui/Displayable.isShown:()Z"] = { frame ->
+            Displayable.isShown(frame)
+        }
+
+        nativeMethods["javax/microedition/lcdui/Displayable.setTicker:(Ljavax/microedition/lcdui/Ticker;)V"] = { frame ->
+            Displayable.setTicker(frame)
+        }
+
+        nativeMethods["javax/microedition/lcdui/Displayable.getTicker:()Ljavax/microedition/lcdui/Ticker;"] = { frame ->
+            Displayable.getTicker(frame)
         }
 
         // javax/microedition/lcdui/Canvas.<init>:()V

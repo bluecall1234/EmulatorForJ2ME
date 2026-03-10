@@ -571,8 +571,16 @@ private fun startGameLoop(game: GameInfo, width: Int, height: Int, onError: (Str
             interpreter.loadClass(classFile.className, classFile.bytes)
 
             println("[EmulatorThread] Executing J2ME startApp()...")
-            interpreter.executeMethod(classFile.className, "<init>", emptyArray())
-            interpreter.executeMethod(classFile.className, "startApp", emptyArray())
+            
+            // Allocate the MIDlet instance
+            val midletInstance = interpreter.allocateObject(classFile.className)
+            interpreter.activeMIDlet = midletInstance
+            
+            // Execute <init> with 'this' reference
+            interpreter.executeMethod(classFile.className, "<init>", arrayOf(midletInstance))
+            
+            // Execute startApp with 'this' reference
+            interpreter.executeMethod(classFile.className, "startApp", arrayOf(midletInstance))
             
             // The J2ME game manages its own render loop via Thread+Runnable+Canvas.repaint()
             // We just need to keep this coroutine alive until the user exits

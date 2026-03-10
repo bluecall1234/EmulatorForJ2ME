@@ -3,7 +3,9 @@ import emulator.core.classfile.ConstantPool
 import emulator.core.classfile.ConstantPoolEntry
 import emulator.core.memory.HeapObject
 
-class JavaExceptionWrapper(val exception: Any?) : RuntimeException("Java Exception")
+class JavaExceptionWrapper(val exception: Any?) : RuntimeException(
+    "Java Exception: ${if (exception is emulator.core.memory.HeapObject) exception.className else exception?.toString() ?: "null"}"
+)
 
 /**
  * The Execution Engine - the core "brain" of the J2ME emulator.
@@ -31,7 +33,24 @@ class ExecutionEngine(
 ) {
 
     // Enable/disable verbose logging of each opcode execution
-    var debugMode: Boolean = false
+    var debugMode: Boolean = true
+
+    private fun throwException(frame: ExecutionFrame, className: String) {
+        val exception = interpreter.allocateObject(className)
+        // Note: For now we don't call <init> on the exception for simplicity
+        // as it might trigger recursive interpretation during another crash.
+        // Most code only cares about the class of the thrown object.
+        
+        val handlerPc = findExceptionHandler(frame, exception)
+        if (handlerPc != -1) {
+            frame.pc = handlerPc
+            frame.push(exception)
+            if (debugMode) println("  [VM] Exception $className thrown and caught! Jumping to PC=$handlerPc")
+        } else {
+            if (debugMode) println("  [VM] Exception $className thrown but NOT caught in current frame.")
+            throw JavaExceptionWrapper(exception)
+        }
+    }
 
     /**
      * Execute a method's bytecode in the given frame.
@@ -544,6 +563,10 @@ class ExecutionEngine(
                 }
                 Opcodes.ARRAYLENGTH -> {
                     val arr = frame.pop()
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
                     val len = when (arr) {
                         is IntArray -> arr.size
                         is ByteArray -> arr.size
@@ -560,85 +583,243 @@ class ExecutionEngine(
                 }
                 Opcodes.IALOAD -> {
                     val index = frame.popInt()
-                    val arr = frame.pop() as IntArray
+                    val arr = frame.pop() as? IntArray
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    if (index < 0 || index >= arr.size) {
+                        throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                        continue
+                    }
                     frame.push(arr[index])
                 }
                 Opcodes.IASTORE -> {
                     val value = frame.popInt()
                     val index = frame.popInt()
-                    val arr = frame.pop() as IntArray
+                    val arr = frame.pop() as? IntArray
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    if (index < 0 || index >= arr.size) {
+                        throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                        continue
+                    }
                     arr[index] = value
                 }
                 Opcodes.BALOAD -> {
                     val index = frame.popInt()
-                    when (val arr = frame.pop()) {
-                        is ByteArray -> frame.push(arr[index].toInt())
-                        is BooleanArray -> frame.push(if (arr[index]) 1 else 0)
+                    val arr = frame.pop()
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    when (arr) {
+                        is ByteArray -> {
+                            if (index < 0 || index >= arr.size) {
+                                throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                                continue
+                            }
+                            frame.push(arr[index].toInt())
+                        }
+                        is BooleanArray -> {
+                            if (index < 0 || index >= arr.size) {
+                                throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                                continue
+                            }
+                            frame.push(if (arr[index]) 1 else 0)
+                        }
                         else -> throw RuntimeException("BALOAD on invalid array type: ${arr?.let { it::class.simpleName }}")
                     }
                 }
                 Opcodes.BASTORE -> {
                     val value = frame.popInt()
                     val index = frame.popInt()
-                    when (val arr = frame.pop()) {
-                        is ByteArray -> arr[index] = value.toByte()
-                        is BooleanArray -> arr[index] = (value != 0)
+                    val arr = frame.pop()
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    when (arr) {
+                        is ByteArray -> {
+                            if (index < 0 || index >= arr.size) {
+                                throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                                continue
+                            }
+                            arr[index] = value.toByte()
+                        }
+                        is BooleanArray -> {
+                            if (index < 0 || index >= arr.size) {
+                                throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                                continue
+                            }
+                            arr[index] = (value != 0)
+                        }
                         else -> throw RuntimeException("BASTORE on invalid array type: ${arr?.let { it::class.simpleName }}")
                     }
                 }
                 Opcodes.CALOAD -> {
                     val index = frame.popInt()
-                    val arr = frame.pop() as CharArray
+                    val arr = frame.pop() as? CharArray
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    if (index < 0 || index >= arr.size) {
+                        throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                        continue
+                    }
                     frame.push(arr[index].code)
                 }
                 Opcodes.CASTORE -> {
                     val value = frame.popInt()
                     val index = frame.popInt()
-                    val arr = frame.pop() as CharArray
+                    val arr = frame.pop() as? CharArray
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    if (index < 0 || index >= arr.size) {
+                        throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                        continue
+                    }
                     arr[index] = value.toChar()
                 }
                 Opcodes.SALOAD -> {
                     val index = frame.popInt()
-                    val arr = frame.pop() as ShortArray
+                    val arr = frame.pop() as? ShortArray
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    if (index < 0 || index >= arr.size) {
+                        throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                        continue
+                    }
                     frame.push(arr[index].toInt())
                 }
                 Opcodes.SASTORE -> {
                     val value = frame.popInt()
                     val index = frame.popInt()
-                    val arr = frame.pop() as ShortArray
+                    val arr = frame.pop() as? ShortArray
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    if (index < 0 || index >= arr.size) {
+                        throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                        continue
+                    }
                     arr[index] = value.toShort()
                 }
                 Opcodes.LALOAD -> {
                     val index = frame.popInt()
-                    val arr = frame.pop() as LongArray
+                    val arr = frame.pop() as? LongArray
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    if (index < 0 || index >= arr.size) {
+                        throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                        continue
+                    }
                     frame.push(arr[index])
                 }
                 Opcodes.LASTORE -> {
                     val value = frame.popLong()
                     val index = frame.popInt()
-                    val arr = frame.pop() as LongArray
+                    val arr = frame.pop() as? LongArray
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    if (index < 0 || index >= arr.size) {
+                        throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                        continue
+                    }
                     arr[index] = value
                 }
                 Opcodes.FALOAD -> {
                     val index = frame.popInt()
-                    val arr = frame.pop() as FloatArray
+                    val arr = frame.pop() as? FloatArray
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    if (index < 0 || index >= arr.size) {
+                        throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                        continue
+                    }
                     frame.push(arr[index])
                 }
                 Opcodes.FASTORE -> {
-                    val value = frame.pop() as Float
+                    val value = frame.popFloat()
                     val index = frame.popInt()
-                    val arr = frame.pop() as FloatArray
+                    val arr = frame.pop() as? FloatArray
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    if (index < 0 || index >= arr.size) {
+                        throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                        continue
+                    }
                     arr[index] = value
                 }
                 Opcodes.DALOAD -> {
                     val index = frame.popInt()
-                    val arr = frame.pop() as DoubleArray
+                    val arr = frame.pop() as? DoubleArray
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    if (index < 0 || index >= arr.size) {
+                        throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                        continue
+                    }
                     frame.push(arr[index])
                 }
                 Opcodes.DASTORE -> {
-                    val value = frame.pop() as Double
+                    val value = frame.popDouble()
                     val index = frame.popInt()
-                    val arr = frame.pop() as DoubleArray
+                    val arr = frame.pop() as? DoubleArray
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    if (index < 0 || index >= arr.size) {
+                        throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                        continue
+                    }
+                    arr[index] = value
+                }
+                Opcodes.AALOAD -> {
+                    val index = frame.popInt()
+                    val arr = frame.pop() as? Array<*>
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    if (index < 0 || index >= arr.size) {
+                        throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                        continue
+                    }
+                    frame.push(arr[index])
+                }
+                Opcodes.AASTORE -> {
+                    val value = frame.pop()
+                    val index = frame.popInt()
+                    @Suppress("UNCHECKED_CAST")
+                    val arr = frame.pop() as? Array<Any?>
+                    if (arr == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
+                    if (index < 0 || index >= arr.size) {
+                        throwException(frame, "java/lang/ArrayIndexOutOfBoundsException")
+                        continue
+                    }
                     arr[index] = value
                 }
 
@@ -676,7 +857,11 @@ class ExecutionEngine(
                 Opcodes.GETFIELD -> {
                     val index = frame.readU2()
                     val (_, name, desc) = constantPool.resolveFieldRef(index)
-                    val obj = frame.pop() as emulator.core.memory.HeapObject
+                    val obj = frame.pop() as? emulator.core.memory.HeapObject
+                    if (obj == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
                     val value = obj.instanceFields["$name:$desc"] ?: getDefaultValueForType(desc)
                     if (debugMode) println("  [VM] GETFIELD $name:$desc -> $value on $obj")
                     frame.push(value)
@@ -686,7 +871,11 @@ class ExecutionEngine(
                     val index = frame.readU2()
                     val (_, name, desc) = constantPool.resolveFieldRef(index)
                     val value = frame.pop()
-                    val obj = frame.pop() as emulator.core.memory.HeapObject
+                    val obj = frame.pop() as? emulator.core.memory.HeapObject
+                    if (obj == null) {
+                        throwException(frame, "java/lang/NullPointerException")
+                        continue
+                    }
                     if (debugMode) println("  [VM] PUTFIELD $name:$desc = $value on $obj")
                     obj.instanceFields["$name:$desc"] = value
                 }
@@ -721,8 +910,24 @@ class ExecutionEngine(
                     var currentCls: String? = if (isStatic || opcode == Opcodes.INVOKESPECIAL) {
                         cls
                     } else {
-                        val obj = frame.peekAt(argCount) as? HeapObject
-                        obj?.className ?: cls
+                        val obj = frame.peekAt(argCount)
+                        if (obj == null) {
+                            throwException(frame, "java/lang/NullPointerException")
+                            continue
+                        }
+                        when (obj) {
+                            is HeapObject -> obj.className
+                            is String -> "java/lang/String"
+                            is IntArray -> "[I"
+                            is ByteArray -> "[B"
+                            is CharArray -> "[C"
+                            is ShortArray -> "[S"
+                            is LongArray -> "[J"
+                            is FloatArray -> "[F"
+                            is DoubleArray -> "[D"
+                            is Array<*> -> "[Ljava/lang/Object;"
+                            else -> throw RuntimeException("Unsupported object type on stack: ${obj::class.simpleName}")
+                        }
                     }
                     
                     var isNativeHandled = false
@@ -949,13 +1154,27 @@ class ExecutionEngine(
                 // Propagate to caller
                 throw e
             } catch (e: Throwable) {
-                val javaEx = if (e.message?.contains("java/io/EOFException") == true) {
-                    println("[VM] Converting native EOFException to Java EOFException")
-                    interpreter.allocateObject("java/io/EOFException")
-                } else {
-                    println("[VM] Native exception during execution: ${e.message}")
-                    e.printStackTrace()
-                    throw e
+                val javaEx = when {
+                    e.message?.contains("java/io/EOFException") == true -> {
+                        println("[VM] Converting native EOFException to Java EOFException")
+                        interpreter.allocateObject("java/io/EOFException")
+                    }
+                    e is IndexOutOfBoundsException -> {
+                        println("[VM] Converting native IndexOutOfBoundsException to Java ArrayIndexOutOfBoundsException: ${e.message}")
+                        interpreter.allocateObject("java/lang/ArrayIndexOutOfBoundsException")
+                    }
+                    e is NullPointerException -> {
+                        println("[VM] Converting native NullPointerException to Java NullPointerException")
+                        interpreter.allocateObject("java/lang/NullPointerException")
+                    }
+                    else -> {
+                        println("[VM] Native exception during execution: ${e.message}")
+                        e.printStackTrace()
+                        // Wrap other exceptions in RuntimeException for J2ME
+                        val errObj = interpreter.allocateObject("java/lang/RuntimeException")
+                        // Optionally set message field if we implement it
+                        errObj
+                    }
                 }
                 
                 val handlerPc = findExceptionHandler(frame, javaEx)

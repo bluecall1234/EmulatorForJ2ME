@@ -34,6 +34,13 @@ class ExecutionFrame(
 
     // Local Variables: slot 0 is usually "this" for instance methods
     val locals = arrayOfNulls<Any?>(maxLocals)
+    
+    init {
+        if (maxLocals == 0 && bytecode.isNotEmpty()) {
+            // This is strange, but let's see if it happens
+            // println("[Frame] WARNING: $className.$methodName has maxLocals=0 but contains bytecode!")
+        }
+    }
 
     // --- Stack Operations ---
 
@@ -69,6 +76,24 @@ class ExecutionFrame(
             is Long -> value
             is Int -> value.toLong()
             else -> throw RuntimeException("Expected long on stack, got ${value?.let { it::class.simpleName }}")
+        }
+    }
+
+    fun popFloat(): Float {
+        val value = pop()
+        return when (value) {
+            is Float -> value
+            is Int -> Float.fromBits(value)
+            else -> throw RuntimeException("Expected float on stack, got ${value?.let { it::class.simpleName }}")
+        }
+    }
+
+    fun popDouble(): Double {
+        val value = pop()
+        return when (value) {
+            is Double -> value
+            is Long -> Double.fromBits(value)
+            else -> throw RuntimeException("Expected double on stack, got ${value?.let { it::class.simpleName }}")
         }
     }
 
